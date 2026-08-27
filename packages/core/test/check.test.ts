@@ -547,10 +547,11 @@ describe("checkProject", () => {
   });
 
   test("two creates aimed at one path: captured bytes beat the layout stub, reported once", async () => {
-    // The layout rule wants .editorconfig to exist (empty stub); the config
-    // rule wants it to hold the captured bytes. Unreconciled, whichever ran
-    // first used to win: a 0-byte file reported as two successful fixes,
-    // with a violation no later --fix could ever clear.
+    // The layout rule used to want .editorconfig to exist (empty stub) while
+    // the config rule wanted it to hold the captured bytes. Unreconciled,
+    // whichever ran first won: a 0-byte file reported as two successful
+    // fixes, with a violation no later --fix could ever clear. The layout
+    // rule now stands down for captured files, and creates still reconcile.
     const store = await freshStore();
     await seed(store, {
       name: "cfg",

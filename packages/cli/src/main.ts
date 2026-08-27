@@ -1,4 +1,7 @@
 #!/usr/bin/env bun
+import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import {
   type AiStatus,
@@ -25,6 +28,7 @@ import {
   PatternStore,
   PROVIDERS,
   type Proposal,
+  parsePatternDocument,
   pathLabel,
   readPatternMarker,
   renderExport,
@@ -61,7 +65,9 @@ program
     await saveExtractedPattern(store, result);
 
     const facets = facetNames(pattern).join(", ");
-    const captured = Object.keys(result.files).length;
+    const captured = Object.keys(result.files).filter((file) =>
+      file.startsWith("toolchain/"),
+    ).length;
     console.log(
       `Saved pattern "${pattern.name}" (facets: ${facets || "none"}${captured ? `; ${captured} config${captured === 1 ? "" : "s"} captured` : ""}).`,
     );
@@ -213,9 +219,16 @@ program
       const { proposals, changed } = options.once
         ? { proposals: await learnDrift(store, name, options.dir), changed: [] }
         : await watchUntilStopped(store, name, options.dir);
-      // The one model call of a session, and only with the layer on.
+      // The one model call of a session, and only with the layer on; a provider
+      // failure is said in its words, and the deterministic proposals stand.
       const doc = await store.load(name);
-      proposals.push(...(await draftConventions(doc, options.dir, changed, proposals)));
+      try {
+        proposals.push(...(await draftConventions(doc, options.dir, changed, proposals)));
+      } catch (error) {
+        console.error(
+          `Conventions were not drafted: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       if (proposals.length === 0) {
         console.log(`Nothing to learn: the project already matches "${name}".`);
         return;
@@ -273,11 +286,17 @@ program
     const editor = process.env.VISUAL || process.env.EDITOR;
     if (!editor) throw new Error("Set $EDITOR (or $VISUAL) so dolly knows which editor to open.");
 
+    // The editor works on a copy; the store's own file changes only once the copy parses.
+    const draft = join(tmpdir(), `dolly-edit-${name}-${process.pid}.md`);
+    await copyFile(store.pathOf(name), draft);
     let editing = true;
     while (editing) {
-      await openEditor(editor, store.pathOf(name));
+      await openEditor(editor, draft);
+      const source = await readFile(draft, "utf8");
       try {
-        const doc = await store.load(name);
+        const doc = parsePatternDocument(source);
+        await writeFile(store.pathOf(name), source);
+        await rm(draft, { force: true });
         console.log(`"${name}" saved and valid.`);
         if (doc.pattern.name !== name) {
           console.log(
@@ -288,7 +307,10 @@ program
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         editing = process.stdin.isTTY ? await confirmRetry() : false;
-        if (!editing) process.exitCode = 1;
+        if (!editing) {
+          console.error(`Nothing written. Your edit is kept at ${draft}.`);
+          process.exitCode = 1;
+        }
       }
     }
   });
@@ -298,7 +320,20 @@ program
   .argument("<name>", "pattern to delete")
   .description("Delete a saved pattern.")
   .action(async (name: string) => {
-    await new PatternStore().delete(name);
+    const store = new PatternStore();
+    if (!(await store.has(name))) throw new PatternNotFoundError(name);
+    if (process.stdin.isTTY) {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const typed = (
+        await rl.question(`Type "${name}" to delete it and its captured files: `)
+      ).trim();
+      rl.close();
+      if (typed !== name) {
+        console.log("Kept.");
+        return;
+      }
+    }
+    await store.delete(name);
     console.log(`Deleted pattern "${name}".`);
   });
 

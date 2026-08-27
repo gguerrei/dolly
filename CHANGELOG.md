@@ -293,3 +293,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm's legacy `license: { type }` object form rendered as
   `[object Object]` in violation messages; `requires-python` and
   `rust-version` were read by regex over raw TOML instead of parsed.
+- The functional review of the recovered tree (2026-08-27): a translation's
+  verification ran the pattern's commands without the project's own bins on
+  the PATH, so `tsc` was never found and no translation could commit; the
+  AI budgets were sized for the reply alone, which a model that reasons
+  first left empty or cut short; learn proposed `packages/lamb/` under a
+  pattern that already lists `packages/{name}/`; a failed convention draft
+  was silent; `dolly edit` left an invalid save in the store (the editor
+  now works on a copy, written back only once it parses); `dolly delete`
+  asks for the name on a terminal, as the GUI confirms; a missing captured
+  config was reported by two rules; extract counted templates as configs;
+  and the export preview demanded a directory even with the pattern named.

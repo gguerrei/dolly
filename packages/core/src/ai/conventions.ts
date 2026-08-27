@@ -18,9 +18,10 @@ const MAX_FILES = 12;
 const EXCERPT_BYTES = 1500;
 
 /**
- * Prose proposals drafted from a learn session, or none: with the layer off,
- * with nothing changed, or on any provider failure, learning stays
- * deterministic and this returns an empty list without a call.
+ * Prose proposals drafted from a learn session, or none: with the layer off
+ * or with nothing changed, learning stays deterministic and this returns an
+ * empty list without a call. A provider failure is the provider's error, in
+ * its words, for the caller to show; the deterministic proposals stand.
  */
 export async function draftConventions(
   doc: PatternDocument,
@@ -31,11 +32,7 @@ export async function draftConventions(
   if (changedFiles.length === 0) return [];
   const client = await activeAi();
   if (!client) return [];
-  try {
-    return await draft(client, doc, root, changedFiles, drift);
-  } catch {
-    return [];
-  }
+  return draft(client, doc, root, changedFiles, drift);
 }
 
 async function draft(
@@ -74,7 +71,8 @@ async function draft(
       `Files changed during the session (${changedFiles.length}, showing ${excerpts.length}):`,
       ...excerpts,
     ].join("\n"),
-    maxTokens: 600,
+    // Five short lines, after whatever reasoning the model spends first; the budget holds both.
+    maxTokens: 4000,
   });
   return reply
     .split("\n")

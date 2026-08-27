@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assistedFit } from "../src/ai/placement";
@@ -163,13 +163,20 @@ describe("translation", () => {
   });
 
   test("apply writes, verifies with the pattern's commands, removes the sources, and commits", async () => {
-    const { store, root } = await pythonProject({ typecheck: "true", test: "true" });
+    // The typecheck command is a tool the project installed for itself, the way tsc is.
+    const { store, root } = await pythonProject({ typecheck: "own-typecheck", test: "true" });
+    await mkdir(join(root, "node_modules", ".bin"), { recursive: true });
+    await writeFile(join(root, "node_modules", ".bin", "own-typecheck"), "#!/bin/sh\nexit 0\n", {
+      mode: 0o755,
+    });
+    await git(root, "add", "-A");
+    await git(root, "commit", "-q", "-m", "own tool");
     await turnOn();
     stubModel(wellFormed);
     const result = await assistedFitApply(store, "ts-service", root);
     expect(result.failures).toEqual([]);
     expect(result.committed).toBe(true);
-    expect(result.verified).toEqual(["typecheck passed: true", "test passed: true"]);
+    expect(result.verified).toEqual(["typecheck passed: own-typecheck", "test passed: true"]);
     expect(await readFile(join(root, "src/greet.ts"), "utf8")).toContain("export function greet");
     expect(await Bun.file(join(root, "src/greet.py")).exists()).toBe(false);
     // The second call saw the first translation as house style, and the whole mapping.
@@ -211,8 +218,8 @@ describe("translation", () => {
     expect(result.verified.join("\n")).toContain("typecheck failed");
     expect(result.verified.join("\n")).toContain("src/main.ts: type error");
     expect(result.verified.join("\n")).toContain("no test command in the pattern");
-    expect(result.failures).toContain(
-      "verification failed, so the sources stay and nothing is committed",
+    expect(result.failures.join("\n")).toContain(
+      "verification failed, so the sources stay and nothing is committed; the translated files sit beside them",
     );
     expect(await Bun.file(join(root, "src/greet.py")).exists()).toBe(true);
     expect(await Bun.file(join(root, "src/greet.ts")).exists()).toBe(true); // left for inspection

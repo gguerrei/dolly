@@ -365,6 +365,8 @@ describe("dolly serve", () => {
       contents: expect.stringContaining("- `docs/` (required)"),
     });
     expect((await query("pattern=tidy&as=bundle")).status).toBe(400);
+    // Named outright, the preview needs no directory at all.
+    expect((await api("/api/export?pattern=tidy&as=prompt")).status).toBe(200);
     expect((await query("pattern=ghost&as=prompt")).status).toBe(404);
 
     const save = (force?: boolean) =>

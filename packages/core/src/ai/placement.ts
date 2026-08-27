@@ -82,7 +82,8 @@ async function suggest(
       "The file's opening bytes:",
       await excerptOf(join(root, item.path)),
     ].join("\n"),
-    maxTokens: 300,
+    // One line and its why, after whatever reasoning the model spends first; the budget holds both.
+    maxTokens: 2000,
   });
   const lines = reply
     .split("\n")

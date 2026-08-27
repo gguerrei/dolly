@@ -110,6 +110,11 @@ describe("dolly CLI", () => {
     const { stderr, exitCode } = await dollyWithEnv({ EDITOR: editor }, "edit", "tidy");
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Invalid pattern facets");
+    // The store never holds the broken draft: the editor worked on a copy.
+    expect(stderr).toContain("Nothing written. Your edit is kept at");
+    expect(await readFile(join(home, "patterns", "tidy", "pattern.md"), "utf8")).toBe(
+      "---\nname: tidy\n---\n",
+    );
   });
 
   test("edit explains itself when no editor is configured", async () => {

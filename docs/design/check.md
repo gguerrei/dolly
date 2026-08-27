@@ -78,7 +78,7 @@ path, a message, and at most one autofix:
 
 | Rule | Reads | Violation | Autofix |
 |---|---|---|---|
-| `layout` | layout entries with `required: true` | path absent (`{name}` matches any one segment) | create the directory, or the file via new's stub |
+| `layout` | layout entries with `required: true`, minus the files the toolchain captured (those are the config rule's) | path absent (`{name}` matches any one segment) | create the directory, or the file via new's stub |
 | `naming` | naming facet | file/dir name off-convention (extension overrides win) | none: renames break imports; `fit` (M6) owns them |
 | `config` | toolchain.configs + binding | captured key missing/unequal (subset) or bytes differ (verbatim) | merge the keys / write the bytes |
 | `commands` | commands facet | verb missing or command unequal in manifest scripts / taskfile | scripts: merge the entry; taskfile: append a missing recipe (a differing recipe is report-only; it may have grown a body dolly must not rewrite) |

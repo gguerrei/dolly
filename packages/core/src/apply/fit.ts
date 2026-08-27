@@ -1,5 +1,5 @@
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { basename, delimiter, join, resolve } from "node:path";
 import { checkProject } from "../check/check";
 import { applyFix, type FixPlan, losingCreates } from "../check/fix";
 import type { Violation } from "../check/rule";
@@ -603,7 +603,12 @@ async function verifyTranslations(
       );
       continue;
     }
-    const child = Bun.spawn(["sh", "-c", command], { cwd: root, stdout: "pipe", stderr: "pipe" });
+    const child = Bun.spawn(["sh", "-c", command], {
+      cwd: root,
+      env: { ...process.env, PATH: projectPath(root) },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const [code, stdout, stderr] = await Promise.all([
       child.exited,
       new Response(child.stdout).text(),
@@ -616,6 +621,12 @@ async function verifyTranslations(
     }
   }
   return { ok, notes };
+}
+
+/** The project's own bins ahead of the caller's PATH, so `tsc` or `ruff` resolve as they do for its author. */
+function projectPath(root: string): string {
+  const own = [join(root, "node_modules", ".bin"), join(root, ".venv", "bin")];
+  return [...own, process.env.PATH ?? ""].join(delimiter);
 }
 
 export interface FitApplyResult {
@@ -669,7 +680,11 @@ export async function fitApply(
       applied.push(
         `removed ${translated.length} translated source${translated.length === 1 ? "" : "s"}`,
       );
-    } else failures.push("verification failed, so the sources stay and nothing is committed");
+    } else {
+      failures.push(
+        "verification failed, so the sources stay and nothing is committed; the translated files sit beside them for inspection, so delete them before planning again, or `git switch` to the checkpoint",
+      );
+    }
   }
   // A half-applied tree is never committed. It stays in the working tree
   // for inspection, with the checkpoint branch still marking the pre-fit
@@ -690,7 +705,7 @@ export async function fitApply(
     }
   } else if (applied.length > 0) {
     failures.push(
-      "not committed because some steps failed; inspect the working tree (the checkpoint branch still marks the pre-fit state)",
+      "not committed because some steps failed; inspect the working tree (the checkpoint branch still marks the pre-fit state), and delete any translated file left beside its source before planning again",
     );
   }
   return { plan, checkpoint, applied, failures, verified, committed };

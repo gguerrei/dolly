@@ -36,6 +36,22 @@ describe("drift", () => {
     expect(await learnDrift(store, "widget", root)).toEqual([]);
   });
 
+  test("an instance of a {name} entry is not drift", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "mono",
+      languages: { programming: ["TypeScript"] },
+      layout: [
+        { path: "packages/", required: true },
+        { path: "packages/{name}/", required: false },
+        { path: "packages/{name}/src/", required: true },
+      ],
+    });
+    const root = await repo({ "packages/lamb/src/index.ts": "export {};\n" });
+    const layout = (await learnDrift(store, "mono", root)).filter((p) => p.path[0] === "layout");
+    expect(layout).toEqual([]);
+  });
+
   test("new verbs, purposes, layout entries, and drifted configs become proposals", async () => {
     const { store, root } = await extracted();
     await writeFile(
@@ -212,15 +228,18 @@ describe("conventions", () => {
     expect(sent).toContain("commands.lint: a new verb");
   });
 
-  test("no changed files means no call, and a provider failure drafts nothing", async () => {
+  test("no changed files means no call, and a provider failure surfaces in the provider's words", async () => {
     const { store, root } = await extracted();
     await turnOn();
     stubModel("- anything");
     expect(await draftConventions(await store.load("widget"), root, [], [])).toEqual([]);
     expect(requests.length).toBe(0);
-    globalThis.fetch = (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch;
-    expect(await draftConventions(await store.load("widget"), root, ["src/Widget.ts"], [])).toEqual(
-      [],
-    );
+    globalThis.fetch = (async () =>
+      new Response('{"error":{"message":"overloaded"}}', {
+        status: 529,
+      })) as unknown as typeof fetch;
+    await expect(
+      draftConventions(await store.load("widget"), root, ["src/Widget.ts"], []),
+    ).rejects.toThrow("overloaded");
   });
 });

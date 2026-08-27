@@ -8,6 +8,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { nameRegex } from "../check/rules/layout";
 import { extractPattern } from "../extract/extract";
 import type { LayoutEntry, Pattern } from "../pattern/schema";
 import { isPlainObject } from "../serialize";
@@ -100,8 +101,13 @@ function leafDrift(fresh: unknown, current: unknown, path: string[]): Proposal[]
 /** Entries the project carries that the pattern has no line for, in the extractor's order. */
 function layoutDrift(fresh: LayoutEntry[], current: LayoutEntry[]): Proposal[] {
   const known = new Set(current.map((entry) => entry.path));
+  // An instance of a {name} entry (packages/lamb/ under packages/{name}/) is not drift.
+  const bare = (path: string) => path.replace(/\/$/, "");
+  const templated = current
+    .filter((entry) => entry.path.includes("{name}"))
+    .map((entry) => nameRegex(bare(entry.path)));
   return fresh
-    .filter((entry) => !known.has(entry.path))
+    .filter((entry) => !known.has(entry.path) && !templated.some((re) => re.test(bare(entry.path))))
     .map((entry) => ({
       path: ["layout"],
       value: entry,

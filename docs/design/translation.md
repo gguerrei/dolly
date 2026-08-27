@@ -72,7 +72,8 @@ else changes.
    continues, so the report names every failure at once.
 4. If any step failed: stop, commit nothing, report.
 5. Run the pattern's `typecheck` and `test` commands, when defined, in the
-   project root with the project's own environment. A non-zero exit is a
+   project root with the project's own bins (`node_modules/.bin`,
+   `.venv/bin`) ahead of the PATH. A non-zero exit is a
    failed verification: stop, commit nothing, report the output.
 6. Remove every translate step's source file, `git add -A`, commit
    `dolly fit <pattern>`. The result: a project that `dolly check` reads

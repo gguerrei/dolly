@@ -65,7 +65,7 @@ that does not validate).
 | `GET /api/learn?dir&pattern` | `watchLearning` | the learn stream: one NDJSON line per re-learn, `{ proposals, changed }`, the watcher stopped when the client goes away |
 | `POST /api/learn` | `saveLearned` | `{ dir, pattern?, accepted }`: the review's outcome written together; a captured path that leaves the pattern directory is a 400 |
 | `POST /api/learn/draft` | `draftConventions` | `{ dir, pattern?, changed, proposals }`: the session's one model call, an empty list with AI off |
-| `GET /api/export?pattern&as` | `renderExport` | the preview: `{ target, path, contents }`, a pure function of the pattern; `as` is one of the text targets |
+| `GET /api/export?as&pattern` | `renderExport` | the preview: `{ target, path, contents }`, a pure function of the pattern; `as` is one of the text targets, and `dir` stands in for `pattern` when the project's marker should name it |
 | `POST /api/export` | `exportPattern` | `{ dir, pattern?, as, force? }` writes the file at the target's own path under `dir` (409 until `force`); `{ out, pattern, as: "bundle" }` writes the bundle where the native save dialog chose |
 | `POST /api/extract` | `extractPattern` + `saveExtractedPattern` | `{ dir, name?, force? }`: what was saved, the way `dolly extract` says it; an existing name is 409 until `force` |
 | `POST /api/new` | `scaffoldProject` | `{ pattern, dir }`: the `ScaffoldReport`; a directory that is not empty is 409 |
