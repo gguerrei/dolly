@@ -50,7 +50,7 @@ that does not validate).
 
 | Route | Binds | Notes |
 |---|---|---|
-| `GET /api/health` | n/a | `{ name: "dolly", version }`, the GUI's liveness probe |
+| `GET /api/health` | n/a | `{ name: "dolly", version, home }`, the GUI's liveness probe; `home` is the store's directory as a shell would print it, for the library's head |
 | `GET /api/ai` | `aiStatus` | `dolly ai status` as JSON, for the sidebar's AI line |
 | `GET /api/patterns` | `PatternStore.list` | summaries, broken patterns flagged not hidden |
 | `GET /api/patterns/:name` | `PatternStore` + `parsePatternDocument` | raw `source` always; parsed `pattern` + `prose`, or `error` when invalid (the editor needs broken patterns most) |
@@ -92,9 +92,9 @@ when the daemon is unreachable), then a main column with a top bar
 view and every saved pattern) over the content. Seven views behind a hash
 (`#/`, `#/pattern/<name>`, `#/check`, `#/fit`, `#/learn`, `#/export[/<name>]`, `#/settings`), switched by a ref:
 
-- **Library**: every saved pattern as a table row (name, description,
-  facet chips, a validity badge, delete on hover), broken ones flagged the
-  way `dolly list` flags them. Entry point to the other views, and where
+- **Library**: how many patterns are saved and where, then every saved
+  pattern as a table row (name, description, facet chips, a validity badge,
+  delete on hover), broken ones flagged the way `dolly list` flags them. Entry point to the other views, and where
   patterns arrive: Extract a project and Import a bundle open inline
   panels under the head (a path, Browse in the shell, a name for
   extract), and a name already in the library comes back as Replace or
@@ -121,7 +121,8 @@ view and every saved pattern) over the content. Seven views behind a hash
   problem.
 - **Fit**: the same directory (shared with Check via `localStorage`),
   then Plan: moves with their import rewrites as subordinate lines, fixes
-  with their plan kind, translations with their target language and what
+  with their plan kind, each move wearing the rule that asked for it,
+  translations with their target language and what
   would go to the model under Apply, and a "left to you" group for
   everything fit declined, each with its reason. After an apply, the
   verdict of the pattern's typecheck and test commands shows beside the
@@ -183,6 +184,8 @@ blocks and misreads template usage as dead code; `vue-tsc` owns them.
 Every surface starts on a Claude Design canvas and is approved there before it is ported (PLAN, "How visual work happens"). The canvases so far:
 
 - Brand sheet, logo directions, the four app views of the 2026-08-21 redesign, the Learn page (the learn view watching with proposals, and idle; approved and ported 2026-08-21), the Settings page (the AI surface on and off; approved and ported 2026-08-22), the Fit board's translations panel (ported 2026-08-22 to close M7, on the canvas for a look), the Export page (the view after a save, and the view when the file already exists; approved and ported 2026-08-22), and the Flows page (the library extracting a project and importing a bundle, the pattern view scaffolding a new project; designed and ported 2026-08-23, on the canvas for a look): https://claude.ai/code/artifact/e8dce8d4-0b47-4b5f-9d23-a67c9eeb6474
+
+The boards are also kept in the repo under [docs/design/canvas/](canvas/README.md), one `.dc.html` per board plus the `canvas.json` that places them, so a session without the artifact can still read the briefs and re-seed the canvas from here.
 
 ## The native shell
 

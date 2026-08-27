@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+/* dolly app shell. Palette lifted verbatim from apps/desktop/src/theme.css:
+   wool, fleece, pen, charcoal, grey, line, hover, warm, warm-wash. */
+body { margin: 0; background: #fafafa; }
+a { color: inherit; text-decoration: none; }
+a:hover { color: inherit; }
+.app {
+  --wool: #fafafa; --fleece: #ffffff; --pen: #f3f3f2; --charcoal: #1c1c1c;
+  --grey: #6b6b6b; --line: #e2e2e2; --hover: #ececec;
+  --warm: #9a5b00; --warm-wash: #f7efe2;
+  --shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 4px 14px rgb(0 0 0 / 5%);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  display: grid; grid-template-columns: 228px minmax(0, 1fr);
+  width: 1440px; height: 900px; overflow: hidden;
+  background: var(--wool); color: var(--charcoal);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.app.dark {
+  --wool: #121212; --fleece: #1c1c1c; --pen: #161616; --charcoal: #e6e6e6;
+  --grey: #9a9a9a; --line: #2b2b2b; --hover: #242424;
+  --warm: #e0a141; --warm-wash: #2a2113; --shadow: none;
+}
+.mono { font-family: var(--mono); font-size: 0.93em; }
+.muted { color: var(--grey); }
+kbd { font: inherit; font-size: 11px; font-weight: 500; color: var(--grey); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; line-height: 18px; background: var(--wool); }
+code { font-family: var(--mono); font-size: 0.93em; background: var(--hover); border-radius: 4px; padding: 1px 5px; }
+
+/* sidebar */
+.sidebar { display: flex; flex-direction: column; gap: 18px; padding: 16px 12px 14px; background: var(--pen); border-right: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 9px; padding: 2px 8px; font-weight: 700; font-size: 15px; letter-spacing: -0.02em; }
+.brand svg { width: 26px; height: 26px; flex: none; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav a { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; color: var(--grey); font-weight: 500; font-size: 13.5px; }
+.nav a svg { width: 16px; height: 16px; flex: none; }
+.nav a:hover { background: var(--hover); color: var(--charcoal); }
+.nav a.active { background: var(--hover); color: var(--charcoal); font-weight: 600; }
+.nav-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--grey); padding: 0 10px; margin-bottom: 4px; }
+.side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
+.side-foot .row { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 8px; font-size: 12.5px; color: var(--grey); font-variant-numeric: tabular-nums; }
+.side-foot .row svg { width: 14px; height: 14px; flex: none; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--charcoal); flex: none; }
+.dot.offline { background: var(--warm); }
+
+/* main column */
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 52px; padding: 0 28px; border-bottom: 1px solid var(--line); flex: none; }
+.crumbs { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--grey); }
+.crumbs .here { color: var(--charcoal); font-weight: 600; }
+.crumbs svg { width: 14px; height: 14px; }
+.search { display: flex; align-items: center; gap: 8px; width: 280px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--fleece); color: var(--grey); font-size: 13px; }
+.search svg { width: 15px; height: 15px; flex: none; }
+.search span { flex: 1; }
+.content { padding: 28px 28px 40px; overflow: auto; min-height: 0; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+h1 { font-size: 20px; font-weight: 650; letter-spacing: -0.015em; margin: 0; line-height: 1.25; }
+h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
+
+/* controls */
+.btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--fleece); color: var(--charcoal); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn svg { width: 15px; height: 15px; }
+.btn:hover { background: var(--hover); border-color: var(--grey); }
+.btn.primary { background: var(--charcoal); color: var(--wool); border-color: var(--charcoal); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--grey); }
+.btn.ghost:hover { color: var(--charcoal); background: var(--hover); }
+.btn.disabled { color: var(--grey); cursor: not-allowed; background: var(--fleece); border-color: var(--line); }
+.input { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--fleece); color: var(--charcoal); font-size: 13.5px; }
+.input svg { width: 15px; height: 15px; color: var(--grey); flex: none; }
+.input .placeholder { color: var(--grey); }
+.input .mono { font-size: 13px; }
+.badge { display: inline-flex; align-items: center; height: 20px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; color: var(--grey); white-space: nowrap; }
+.badge.broken { border-color: var(--warm); color: var(--warm); }
+.badge.warm { border-color: var(--warm); color: var(--warm); background: var(--warm-wash); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips span { font-size: 11.5px; font-weight: 500; color: var(--grey); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; line-height: 19px; white-space: nowrap; }
+.segmented { display: inline-flex; padding: 3px; gap: 2px; background: var(--pen); border: 1px solid var(--line); border-radius: 9px; }
+.segmented span { padding: 0 12px; height: 26px; line-height: 26px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--grey); }
+.segmented span.on { background: var(--fleece); color: var(--charcoal); font-weight: 600; box-shadow: var(--shadow); }
+
+/* surfaces */
+.panel { background: var(--fleece); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.panel-head h3 { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--grey); }
+.panel-head h3.warm { color: var(--warm); }
+.panel-head .count { color: var(--grey); font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--grey); padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+tr:first-child td { border-top: none; }
+tr.row:hover td { background: var(--hover); }
+td.path { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; width: 1%; padding-right: 28px; }
+tr.sub td { border-top: none; color: var(--grey); font-size: 12.5px; padding-top: 0; }
+tr.sub td.path { padding-left: 34px; }
+.kv td { padding: 7px 14px; font-size: 13.5px; }
+.kv td:first-child { color: var(--grey); white-space: nowrap; width: 1%; padding-right: 28px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.stat { background: var(--fleece); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.stat .n { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat .n.warm { color: var(--warm); }
+.stat .l { font-size: 12.5px; color: var(--grey); }
+.callout { border: 1px solid var(--warm); background: var(--warm-wash); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; }
+.callout strong { font-weight: 600; }
+.empty { text-align: center; padding: 72px 16px; }
+.empty svg { width: 72px; height: 72px; opacity: 0.35; }
+.toast { position: absolute; right: 20px; bottom: 20px; background: var(--charcoal); color: var(--wool); border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 500; box-shadow: var(--shadow); }
+tr.row:hover .btn.ghost, tr.row.hovered .btn.ghost { opacity: 1; }
+tr.row.hovered td { background: var(--hover); }
+h1.mono { font-size: 19px; font-weight: 650; letter-spacing: 0; }
+.crumbs .here.mono { font-size: 13px; }
+.kv td { padding: 6px 14px; line-height: 1.4; }
+.kv td.k { color: var(--grey); white-space: nowrap; width: 1%; padding-right: 24px; }
+.kv td .mono { font-size: 12.5px; }
+.paths { display: flex; flex-direction: column; }
+.paths .p { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 27px; padding: 0 14px; font-family: var(--mono); font-size: 12.5px; border-top: 1px solid var(--line); }
+.paths .p:first-child { border-top: none; }
+.diff { margin: 0; padding: 6px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; white-space: pre; overflow-x: auto; }
+.diff .ln { display: block; padding: 0 14px; color: var(--grey); }
+.diff .add { color: var(--charcoal); background: var(--hover); }
+.diff .del { color: var(--grey); }
+.diff .file { display: block; padding: 0 14px 4px; color: var(--grey); font-family: 'Inter', system-ui, sans-serif; font-size: 12px; }
+.panel.skipped { opacity: 0.55; }
+.panel-head .reason { color: var(--grey); font-size: 12.5px; }
+.pick { display: inline-flex; gap: 4px; }
+.side-foot a.row { text-decoration: none; border-radius: 8px; }
+.side-foot a.row:hover, .side-foot a.row.active { background: var(--hover); color: var(--charcoal); }
+.provider { display: grid; grid-template-columns: 160px minmax(0, 1fr) 180px 200px; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.provider:first-child { border-top: none; }
+.provider .name { font-weight: 600; font-size: 13.5px; }
+.provider .model { font-family: var(--mono); font-size: 12.5px; color: var(--grey); }
+.provider .actions { display: flex; justify-content: flex-end; gap: 6px; }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 500; }
+.switch .track { width: 34px; height: 20px; border-radius: 999px; background: var(--charcoal); position: relative; }
+.switch .track.off { background: var(--line); }
+.switch .knob { position: absolute; top: 2px; left: 16px; width: 16px; height: 16px; border-radius: 50%; background: var(--wool); }
+.switch .track.off .knob { left: 2px; background: var(--fleece); }
+
+  </style>
+</helmet>
+<div class="app {{themeClass}}" style="position: relative;">
+
+<aside class="sidebar">
+  <a class="brand" href="#"><svg viewBox="40 120 432 272" aria-hidden="true"><g transform="translate(0 26)"><g fill="currentColor"><rect x="96" y="226" width="320" height="120" rx="60"></rect><circle cx="256" cy="198" r="84"></circle><circle cx="176" cy="226" r="64"></circle><circle cx="336" cy="226" r="64"></circle><circle cx="128" cy="262" r="48"></circle><circle cx="384" cy="262" r="48"></circle></g><g transform="translate(404 304) rotate(14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="currentColor"></rect><circle cx="26" cy="-8" r="8.5" fill="var(--pen)"></circle></g><g transform="translate(108 304) rotate(-14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="currentColor"></rect><circle cx="-26" cy="-8" r="8.5" fill="var(--pen)"></circle></g></g></svg><span>dolly</span></a>
+  <nav class="nav">
+    <div class="nav-label">Patterns</div>
+    <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.6"></rect><rect x="13.1" y="3.5" width="7.4" height="7.4" rx="1.6"></rect><rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.6"></rect><rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.6"></rect></svg>Library</a>
+    <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="m8.4 12.3 2.5 2.5 4.7-5.2"></path></svg>Check</a>
+    <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12h11"></path><path d="m10.5 8 4 4-4 4"></path><path d="M17.5 4.5h3v15h-3"></path></svg>Fit</a>
+    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h5.5a3 3 0 0 1 3 3v10.5a2 2 0 0 0-2-2h-6.5z"></path><path d="M20.5 5.5H15a3 3 0 0 0-3 3v10.5a2 2 0 0 1 2-2h6.5z"></path></svg>Learn</a>
+    <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"></path><path d="m8 8 4-4 4 4"></path><path d="M4.5 14.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"></path></svg>Export</a>
+  </nav>
+  <div class="side-foot">
+    <a class="row " href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.7 6.7l2.1 2.1M15.2 15.2l2.1 2.1M6.7 17.3l2.1-2.1M15.2 8.8l2.1-2.1"></path></svg><span>AI on</span><span style="margin-left: auto; font-family: var(--mono); font-size: 11.5px;">claude-sonnet-5</span></a>
+    <div class="row"><span class="dot"></span><span>daemon v0.1.0-dev</span></div>
+  </div>
+</aside>
+<div class="main">
+
+<header class="topbar">
+  <div class="crumbs"><span class="here">Learn</span></div>
+  <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span>Search patterns</span><kbd>⌘K</kbd></div>
+</header>
+<div class="content">
+<div class="page-head">
+  <div style="display: flex; flex-direction: column; gap: 2px;">
+    <h1>Learn from a project</h1>
+    <span class="muted" style="font-size: 13px;">dolly watches the project and proposes pattern edits as it changes. Nothing is written until you accept it.</span>
+  </div>
+  <span class="muted" style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><span class="dot"></span>watching, 14 files changed</span>
+</div>
+
+<div class="panel" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px; margin-bottom: 14px;">
+  <div class="input" style="flex: 2 1 260px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2h7.6A1.5 1.5 0 0 1 20.5 9v8a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17z"></path></svg><span class="mono">~/code/acme-api</span></div>
+  <div class="input" style="flex: 1 1 200px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.6"></rect><rect x="13.1" y="3.5" width="7.4" height="7.4" rx="1.6"></rect><rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.6"></rect><rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.6"></rect></svg><span class="placeholder">pattern (from its .dolly marker)</span></div>
+  <span class="btn">Stop watching</span>
+  <span class="btn primary">Write 2 accepted</span>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="n">5</span><span class="l">proposals</span></div>
+  <div class="stat"><span class="n">2</span><span class="l">accepted</span></div>
+  <div class="stat"><span class="n">1</span><span class="l">skipped</span></div>
+  <div class="stat"><span class="l">against</span><span class="n mono" style="font-size: 15px; font-weight: 600; line-height: 26px;">dolly-monorepo</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+
+  <div class="panel">
+    <div class="panel-head">
+      <div style="display: flex; align-items: baseline; gap: 10px;"><span class="mono" style="font-weight: 600; font-size: 13px;">commands.lint</span><span class="reason">the project has commands.lint as biome lint ., which the pattern never set</span></div>
+      <div class="pick"><span class="btn primary" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Accepted</span><span class="btn ghost" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Skip</span></div>
+    </div>
+    <pre class="diff"><span class="ln">    typecheck: tsc --noEmit</span><span class="ln add">+   lint: biome lint .</span><span class="ln">  dependencies:</span></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div style="display: flex; align-items: baseline; gap: 10px;"><span class="mono" style="font-weight: 600; font-size: 13px;">dependencies.runtime.web-framework</span><span class="reason">the project has web-framework as hono, which the pattern never set</span></div>
+      <div class="pick"><span class="btn primary" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Accepted</span><span class="btn ghost" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Skip</span></div>
+    </div>
+    <pre class="diff"><span class="ln">      validation: zod</span><span class="ln add">+     web-framework: hono</span><span class="ln">    dev:</span></pre>
+  </div>
+
+  <div class="panel skipped">
+    <div class="panel-head">
+      <div style="display: flex; align-items: baseline; gap: 10px;"><span class="mono" style="font-weight: 600; font-size: 13px;">layout</span><span class="reason">the project has scripts/, which the pattern's layout does not list</span></div>
+      <div class="pick"><span class="btn ghost" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Accept</span><span class="btn" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Skipped</span></div>
+    </div>
+    <pre class="diff"><span class="ln">      required: true</span><span class="ln add">+   - path: scripts/</span><span class="ln add">+     required: true</span></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div style="display: flex; align-items: baseline; gap: 10px;"><span class="mono" style="font-weight: 600; font-size: 13px;">toolchain.configs.biome.json</span><span class="reason">the project's biome.json no longer matches the captured copy</span></div>
+      <div class="pick"><span class="btn" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Accept</span><span class="btn ghost" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Skip</span></div>
+    </div>
+    <pre class="diff"><span class="file">toolchain/biome.json</span><span class="ln">    "formatter": {</span><span class="ln del">-     "lineWidth": 100</span><span class="ln add">+     "lineWidth": 120</span><span class="ln">    },</span></pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div style="display: flex; align-items: center; gap: 10px;"><span class="mono" style="font-weight: 600; font-size: 13px;">conventions</span><span class="badge" style="gap: 5px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.7 6.7l2.1 2.1M15.2 15.2l2.1 2.1M6.7 17.3l2.1-2.1M15.2 8.8l2.1-2.1"></path></svg> drafted by claude-sonnet-5</span><span class="reason">from the files that changed</span></div>
+      <div class="pick"><span class="btn" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Accept</span><span class="btn ghost" style="height: 26px; padding: 0 10px; font-size: 12.5px;">Skip</span></div>
+    </div>
+    <pre class="diff"><span class="ln">  Describe your conventions here. This prose travels with the pattern and is read by humans and the optional AI layer; the facets above are enforced deterministically.</span><span class="ln"> </span><span class="ln add">+ - Service modules under packages/api/src are named for the noun they serve, one per file.</span><span class="ln"> </span></pre>
+  </div>
+
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { themeClass: this.props.dark ? "dark" : "" };
+  }
+}
+</script>
+</body>
+</html>

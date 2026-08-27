@@ -27,6 +27,8 @@ Reconstructed means no captured text existed and the file was rebuilt from its s
 - `docs/design/fit.md`: the original's last edit accidentally removed the blank line after the table, which would have merged the following paragraph into it; the blank line is kept here.
 - `README.md` still says the native Tauri shell "comes later" in two places; that is the original text at `74a1684`.
 - `Cargo.lock` and `apps/desktop/src-tauri/gen/` are generated on the first `cargo` build (Rust is not installed on this Mac).
+- Found and closed on 2026-08-27: `assets/logo.svg`, `assets/app-icon.svg`, `apps/desktop/public/logo.svg` and the Tauri icon set had come back at their Aug 13 line art state, not the solid silhouette commit `3f927b5` shipped. The Aug 21 session drew the delivered files from a scratchpad script whose output the replay never had, so the copies of that day were skipped without a trace. The mark was rewritten from the canvas brand sheet's geometry (`docs/design/canvas/Logo.dc.html`), the icon set regenerated, and the boards themselves now live in `docs/design/canvas/`.
+- The four reconstructed views were checked against their boards on 2026-08-27 through the built webview (docs/PLAN.md, that day's entry); what differed was aligned in the same pass.
 - Git history: only the messages and hashes below survive. This repository starts with a single commit.
 
 ## Original commit history

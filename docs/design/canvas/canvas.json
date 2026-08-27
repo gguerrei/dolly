@@ -1,0 +1,219 @@
+{
+  "artboards": [
+    {
+      "file": "Logo.dc.html",
+      "title": "Brand sheet",
+      "x": 0,
+      "y": 0,
+      "w": 1200,
+      "h": 760,
+      "page": "logo"
+    },
+    {
+      "file": "LogoDirections.dc.html",
+      "title": "Directions",
+      "x": 0,
+      "y": 900,
+      "w": 1200,
+      "h": 560,
+      "page": "logo"
+    },
+    {
+      "file": "Main.dc.html",
+      "title": "Library",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "app"
+    },
+    {
+      "file": "Pattern.dc.html",
+      "title": "Pattern",
+      "x": 1540,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "app"
+    },
+    {
+      "file": "Check.dc.html",
+      "title": "Check",
+      "x": 0,
+      "y": 1040,
+      "w": 1440,
+      "h": 900,
+      "page": "app"
+    },
+    {
+      "file": "Fit.dc.html",
+      "title": "Fit",
+      "x": 1540,
+      "y": 1040,
+      "w": 1440,
+      "h": 900,
+      "page": "app"
+    },
+    {
+      "file": "Learn.dc.html",
+      "title": "Learn, watching",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1080,
+      "page": "learn"
+    },
+    {
+      "file": "LearnIdle.dc.html",
+      "title": "Learn, before watching",
+      "x": 1540,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "learn"
+    },
+    {
+      "file": "SettingsAi.dc.html",
+      "title": "Settings, AI on",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "settings"
+    },
+    {
+      "file": "SettingsAiOff.dc.html",
+      "title": "Settings, AI off",
+      "x": 1540,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "settings"
+    },
+    {
+      "file": "Export.dc.html",
+      "title": "Export, after a save",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "export"
+    },
+    {
+      "file": "ExportExists.dc.html",
+      "title": "Export, the file already exists",
+      "x": 1540,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "export"
+    },
+    {
+      "file": "LibraryExtract.dc.html",
+      "title": "Library, extracting a project",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "flows"
+    },
+    {
+      "file": "LibraryImport.dc.html",
+      "title": "Library, importing a bundle",
+      "x": 1540,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "flows"
+    },
+    {
+      "file": "PatternNew.dc.html",
+      "title": "Pattern, scaffolding a new project",
+      "x": 0,
+      "y": 1040,
+      "w": 1440,
+      "h": 900,
+      "page": "flows"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "logo-note",
+      "x": 1280,
+      "y": 0,
+      "w": 320,
+      "page": "logo",
+      "text": "The mark keeps the two heads and the fleece, drawn as one solid silhouette. Direction A is what the app uses; B and C below are alternates if the sheep should read louder.\n\nSVG files for assets/logo.svg and assets/app-icon.svg are ready to drop in."
+    },
+    {
+      "id": "app-note",
+      "x": 3060,
+      "y": 0,
+      "w": 340,
+      "page": "app",
+      "text": "Same palette as theme.css, both schemes (each screen has a dark tweak above it). Sidebar, top bar with search, table-style lists, stat tiles and grouped reports.\n\nSample data: dolly-monorepo is a real extract of this repo; the other three patterns, the acme-api project and its violations are illustrative."
+    },
+    {
+      "id": "learn-note",
+      "x": 3060,
+      "y": 0,
+      "w": 340,
+      "page": "learn",
+      "text": "The learn view, same anatomy as check and fit: project fields, stat tiles, one panel per proposal with its diff and an accept or skip pair. Write applies the accepted set. The model's convention drafts carry a label so they never pass as the engine's.\n\nBehind it: GET /api/learn streams proposals as NDJSON while watching; POST /api/learn writes the accepted ones."
+    },
+    {
+      "id": "settings-note",
+      "x": 3060,
+      "y": 0,
+      "w": 340,
+      "page": "settings",
+      "text": "The AI surface, reached from the sidebar's AI line. It mirrors dolly ai exactly: status per provider with where its key lives, Use to pick the active one, Connect to paste a key that is verified live before the keychain stores it, an optional model, and the On/Off switch (Off keeps the keys).\n\nNothing here is new behavior; every control is a CLI verb. The key travels to the daemon over loopback with the session token, same as a pasted key reaches the CLI."
+    },
+    {
+      "id": "export-note",
+      "x": 3060,
+      "y": 0,
+      "w": 340,
+      "page": "export",
+      "text": "The export view, same anatomy as check and fit: the pattern and the project directory the other views share, then the target list on the left and the rendered file on the right. Save writes it at the target's own path under the directory; Copy puts the text on the clipboard. The .dolly bundle stays a terminal command until the native file picker lands.\n\nThe preview is the real AGENTS.md dolly renders from its own repository (the icon rows of the layout list trimmed for the board). Export joins the nav on every board; the pattern view's header will link here too.\n\nBehind it: GET /api/export previews, POST /api/export saves, 409 when the file exists, which is the second board."
+    },
+    {
+      "id": "flows-note",
+      "x": 3060,
+      "y": 0,
+      "w": 340,
+      "page": "flows",
+      "text": "The three flows the native shell's pickers unlock (M9): extract and import from the library's head, a new project from the pattern view's head, each as an inline panel in the house style with Browse beside the path. In a plain browser the path is typed and Browse is absent; the verbs read the same.\n\nBehind them: POST /api/extract, /api/new, /api/import, and the bundle on POST /api/export with a save dialog's path. A pattern or directory that already exists is a 409 the panel turns into Replace or Keep mine."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "flows"
+  },
+  "pages": [
+    {
+      "id": "logo",
+      "name": "Logo"
+    },
+    {
+      "id": "app",
+      "name": "App"
+    },
+    {
+      "id": "learn",
+      "name": "Learn"
+    },
+    {
+      "id": "settings",
+      "name": "Settings"
+    },
+    {
+      "id": "export",
+      "name": "Export"
+    },
+    {
+      "id": "flows",
+      "name": "Flows"
+    }
+  ]
+}

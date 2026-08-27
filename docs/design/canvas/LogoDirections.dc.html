@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #fafafa; }
+    * { box-sizing: border-box; }
+    a { color: #1c1c1c; } a:hover { color: #6b6b6b; }
+    .label { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b6b6b; }
+    .note { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; line-height: 1.5; color: #6b6b6b; }
+    .strong { font-family: 'Inter', system-ui, sans-serif; font-size: 13.5px; font-weight: 600; color: #1c1c1c; }
+  </style>
+</helmet>
+<div style="width: 1200px; height: 560px; box-sizing: border-box; background: #fafafa; color: #1c1c1c; font-family: 'Inter', system-ui, sans-serif; padding: 32px 40px; display: flex; flex-direction: column; gap: 18px; overflow: hidden;">
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <span class="label">Directions, low fidelity</span>
+    <span class="note">Three ways to solidify the same creature. A is what the brand sheet and the app use; B and C are here in case the sheep should read louder.</span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+    
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; background: #ffffff; border: 1px solid #1c1c1c; border-radius: 12px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+      <span class="strong">A. Solid</span>
+      <span class="label" style="border: 1px solid #1c1c1c; border-radius: 999px; padding: 2px 8px; color: #1c1c1c;">chosen</span>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: center; height: 200px;"><svg viewBox="40 120 432 272" width="300" height="189" aria-hidden="true"><g transform="translate(0 26)"><g fill="#1c1c1c"><rect x="96" y="226" width="320" height="120" rx="60"></rect><circle cx="256" cy="198" r="84"></circle><circle cx="176" cy="226" r="64"></circle><circle cx="336" cy="226" r="64"></circle><circle cx="128" cy="262" r="48"></circle><circle cx="384" cy="262" r="48"></circle></g><g transform="translate(404 304) rotate(14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="#1c1c1c"></rect><circle cx="26" cy="-8" r="8.5" fill="#fafafa"></circle></g><g transform="translate(108 304) rotate(-14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="#1c1c1c"></rect><circle cx="-26" cy="-8" r="8.5" fill="#fafafa"></circle></g></g></svg></div>
+    <span class="note"><strong style="color: #1c1c1c; font-weight: 600;">Why:</strong> The quietest silhouette: cloud, two faces, nothing else. Closest to Docker, Linear and Vercel marks.</span>
+    <span class="note"><strong style="color: #1c1c1c; font-weight: 600;">Tradeoff:</strong> At 16px the eyes go and it reads as a cloud with two nubs; the wordmark carries the name.</span>
+  </div>
+    
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; background: #ffffff; border: 1px solid #e2e2e2; border-radius: 12px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+      <span class="strong">B. Layered</span>
+      
+    </div>
+    <div style="display: flex; align-items: center; justify-content: center; height: 200px;"><svg viewBox="40 120 432 272" width="300" height="189" aria-hidden="true"><g transform="translate(0 26)"><g fill="#1c1c1c"><rect x="96" y="226" width="320" height="120" rx="60"></rect><circle cx="256" cy="198" r="84"></circle><circle cx="176" cy="226" r="64"></circle><circle cx="336" cy="226" r="64"></circle><circle cx="128" cy="262" r="48"></circle><circle cx="384" cy="262" r="48"></circle></g><g transform="translate(404 304) rotate(14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="#1c1c1c" stroke="#fafafa" stroke-width="14" paint-order="stroke"></rect><circle cx="26" cy="-8" r="8.5" fill="#fafafa"></circle></g><g transform="translate(108 304) rotate(-14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="#1c1c1c" stroke="#fafafa" stroke-width="14" paint-order="stroke"></rect><circle cx="-26" cy="-8" r="8.5" fill="#fafafa"></circle></g></g></svg></div>
+    <span class="note"><strong style="color: #1c1c1c; font-weight: 600;">Why:</strong> A halo separates each head from the fleece, so the heads read as faces in front of the body.</span>
+    <span class="note"><strong style="color: #1c1c1c; font-weight: 600;">Tradeoff:</strong> The halo is a second layer to maintain on every background, and it muddies below 32px.</span>
+  </div>
+    
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 24px; background: #ffffff; border: 1px solid #e2e2e2; border-radius: 12px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+      <span class="strong">C. Grounded</span>
+      
+    </div>
+    <div style="display: flex; align-items: center; justify-content: center; height: 200px;"><svg viewBox="40 120 432 300" width="300" height="208" aria-hidden="true"><g transform="translate(0 26)"><g fill="#1c1c1c"><rect x="150" y="320" width="40" height="60" rx="20"></rect><rect x="322" y="320" width="40" height="60" rx="20"></rect></g><g fill="#1c1c1c"><rect x="96" y="226" width="320" height="120" rx="60"></rect><circle cx="256" cy="198" r="84"></circle><circle cx="176" cy="226" r="64"></circle><circle cx="336" cy="226" r="64"></circle><circle cx="128" cy="262" r="48"></circle><circle cx="384" cy="262" r="48"></circle></g><g transform="translate(404 304) rotate(14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="#1c1c1c"></rect><circle cx="26" cy="-8" r="8.5" fill="#fafafa"></circle></g><g transform="translate(108 304) rotate(-14)"><rect x="-60" y="-31" width="120" height="62" rx="31" fill="#1c1c1c"></rect><circle cx="-26" cy="-8" r="8.5" fill="#fafafa"></circle></g></g></svg></div>
+    <span class="note"><strong style="color: #1c1c1c; font-weight: 600;">Why:</strong> Two legs make it an animal at a glance, even as a favicon.</span>
+    <span class="note"><strong style="color: #1c1c1c; font-weight: 600;">Tradeoff:</strong> Less abstract, more mascot; it sits lower and squarer in a lockup.</span>
+  </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
