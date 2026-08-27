@@ -33,6 +33,15 @@ bun test
 - TypeScript strict mode, no exceptions.
 - Readability first: if a clever line needs a comment to be understood, write the boring version instead.
 
+## Visual work
+
+Anything a person will look at (the mark, a GUI view, an empty state, a
+docs or installer visual) is designed before it is built: on a Claude Design
+canvas, through the `/design` command in Claude Code, and approved there.
+Code follows the approved board and the port is reviewed against it. The
+boards live in [docs/design/canvas/](docs/design/canvas/README.md); the rule
+itself is in [docs/PLAN.md](docs/PLAN.md), "How visual work happens".
+
 ## Commits
 
 We use [Conventional Commits](https://www.conventionalcommits.org/):

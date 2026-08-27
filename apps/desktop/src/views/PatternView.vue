@@ -90,6 +90,56 @@ const configs = computed(() => {
   }));
 });
 const drifted = computed(() => pattern.value !== undefined && pattern.value.name !== props.name);
+
+interface Cell {
+  key: string;
+  value: string;
+  mono?: boolean;
+  dev?: boolean;
+}
+
+/** Two cells to a row, the way the boards lay out the short facets. */
+function pairs<T>(items: T[]): [T, T | undefined][] {
+  const rows: [T, T | undefined][] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    const left = items[i];
+    if (left !== undefined) rows.push([left, items[i + 1]]);
+  }
+  return rows;
+}
+
+const projectCells = computed<Cell[]>(() => {
+  const p = pattern.value;
+  if (!p) return [];
+  const cells: Cell[] = [];
+  if (p.license) cells.push({ key: "license", value: p.license });
+  if (p.languages?.programming?.length) {
+    cells.push({ key: "languages", value: p.languages.programming.join(", ") });
+  }
+  for (const [runtime, range] of Object.entries(p.languages?.versions ?? {})) {
+    cells.push({ key: runtime, value: range, mono: true });
+  }
+  if (p.languages?.natural) cells.push({ key: "docs language", value: p.languages.natural });
+  if (commitsLine.value) cells.push({ key: "commits", value: commitsLine.value });
+  if (releasesLine.value) cells.push({ key: "releases", value: releasesLine.value });
+  return cells;
+});
+const roleCells = computed<Cell[]>(() =>
+  toolRoles.value.map(({ role, tool }) => ({ key: role, value: tool, mono: true })),
+);
+/** Runtime dependencies down the left, dev down the right, as on the board. */
+const dependencyRows = computed<[Cell | undefined, Cell | undefined][]>(() => {
+  const deps = pattern.value?.dependencies;
+  const runtime = Object.entries(deps?.runtime ?? {}).map(
+    ([key, value]): Cell => ({ key, value, mono: true }),
+  );
+  const dev = Object.entries(deps?.dev ?? {}).map(
+    ([key, value]): Cell => ({ key, value, mono: true, dev: true }),
+  );
+  const rows: [Cell | undefined, Cell | undefined][] = [];
+  for (let i = 0; i < Math.max(runtime.length, dev.length); i++) rows.push([runtime[i], dev[i]]);
+  return rows;
+});
 const layout = computed(() => pattern.value?.layout ?? []);
 const shownLayout = computed(() =>
   showAllLayout.value ? layout.value : layout.value.slice(0, LAYOUT_FOLD),
@@ -158,8 +208,10 @@ onMounted(load);
     <template v-else-if="detail">
       <div class="page-head">
         <div class="sub">
-          <h1 class="mono">{{ props.name }}</h1>
-          <span v-if="pattern?.description" class="note">{{ pattern.description }}</span>
+          <div class="title">
+            <h1 class="mono">{{ props.name }}</h1>
+            <span v-if="pattern?.description" class="note">{{ pattern.description }}</span>
+          </div>
           <span v-if="drifted" class="note">
             The frontmatter says "{{ pattern?.name }}", but the pattern stays filed under
             "{{ props.name }}".
@@ -231,33 +283,15 @@ onMounted(load);
 
       <div v-if="reading && pattern" class="two-up">
         <div class="stack">
-          <div v-if="pattern.license || pattern.languages || commitsLine || releasesLine" class="panel">
+          <div v-if="projectCells.length" class="panel">
             <div class="panel-head"><h3>Project</h3></div>
             <table class="kv">
               <tbody>
-                <tr v-if="pattern.license">
-                  <td class="k">license</td>
-                  <td>{{ pattern.license }}</td>
-                </tr>
-                <tr v-if="pattern.languages?.programming?.length">
-                  <td class="k">languages</td>
-                  <td>{{ pattern.languages.programming.join(", ") }}</td>
-                </tr>
-                <tr v-for="(range, runtime) in pattern.languages?.versions" :key="runtime">
-                  <td class="k">{{ runtime }}</td>
-                  <td><span class="mono">{{ range }}</span></td>
-                </tr>
-                <tr v-if="pattern.languages?.natural">
-                  <td class="k">docs language</td>
-                  <td>{{ pattern.languages.natural }}</td>
-                </tr>
-                <tr v-if="commitsLine">
-                  <td class="k">commits</td>
-                  <td>{{ commitsLine }}</td>
-                </tr>
-                <tr v-if="releasesLine">
-                  <td class="k">releases</td>
-                  <td>{{ releasesLine }}</td>
+                <tr v-for="[left, right] in pairs(projectCells)" :key="left.key">
+                  <td class="k">{{ left.key }}</td>
+                  <td><span :class="{ mono: left.mono }">{{ left.value }}</span></td>
+                  <td class="k">{{ right?.key }}</td>
+                  <td><span v-if="right" :class="{ mono: right.mono }">{{ right.value }}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -270,11 +304,13 @@ onMounted(load);
                 {{ configs.length }} {{ configs.length === 1 ? "config" : "configs" }} captured
               </span>
             </div>
-            <table v-if="toolRoles.length" class="kv">
+            <table v-if="roleCells.length" class="kv">
               <tbody>
-                <tr v-for="{ role, tool } in toolRoles" :key="role">
-                  <td class="k">{{ role }}</td>
-                  <td><span class="mono">{{ tool }}</span></td>
+                <tr v-for="[left, right] in pairs(roleCells)" :key="left.key">
+                  <td class="k">{{ left.key }}</td>
+                  <td><span class="mono">{{ left.value }}</span></td>
+                  <td class="k">{{ right?.key }}</td>
+                  <td><span v-if="right" class="mono">{{ right.value }}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -380,15 +416,15 @@ onMounted(load);
             </div>
             <table class="kv">
               <tbody>
-                <tr v-for="(library, purpose) in pattern.dependencies?.runtime" :key="purpose">
-                  <td class="k">{{ purpose }}</td>
-                  <td><span class="mono">{{ library }}</span></td>
-                </tr>
-                <tr v-for="(library, purpose) in pattern.dependencies?.dev" :key="`dev-${purpose}`">
-                  <td class="k">{{ purpose }}</td>
+                <tr v-for="([runtime, dev], index) in dependencyRows" :key="index">
+                  <td class="k">{{ runtime?.key }}</td>
+                  <td><span v-if="runtime" class="mono">{{ runtime.value }}</span></td>
+                  <td class="k">{{ dev?.key }}</td>
                   <td>
-                    <span class="mono">{{ library }}</span>
-                    <span class="badge">dev</span>
+                    <template v-if="dev">
+                      <span class="mono">{{ dev.value }}</span>
+                      <span class="badge">dev</span>
+                    </template>
                   </td>
                 </tr>
               </tbody>

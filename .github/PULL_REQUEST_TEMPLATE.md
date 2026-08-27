@@ -10,4 +10,5 @@
 
 - [ ] `bun run check`, `bun run typecheck`, and `bun test` all pass
 - [ ] Docs updated if behavior changed
+- [ ] Anything visual was designed on the canvas first (`/design`, see `docs/design/canvas/`)
 - [ ] PR title follows Conventional Commits (e.g. `feat(cli): ...`)

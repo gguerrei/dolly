@@ -6,6 +6,7 @@ import PathField from "../components/PathField.vue";
 import { toast } from "../lib/toasts";
 
 const patterns = ref<PatternSummary[]>([]);
+const home = ref("");
 const facets = ref<Record<string, Pattern>>({});
 const error = ref("");
 const loading = ref(true);
@@ -14,6 +15,7 @@ async function load(): Promise<void> {
   error.value = "";
   try {
     patterns.value = await api.listPatterns();
+    home.value = (await api.health()).home;
     // Summaries carry no facets; fetch details for the chips, tolerating
     // stragglers, since a row without chips beats a library that won't load.
     const details = await Promise.allSettled(
@@ -121,7 +123,9 @@ onMounted(load);
     <div class="page-head">
       <div class="sub">
         <h1>Patterns</h1>
-        <span v-if="!loading && patterns.length" class="note">{{ patterns.length }} saved</span>
+        <span v-if="!loading && patterns.length" class="note">
+          {{ patterns.length }} saved<template v-if="home"> in {{ home }}</template>
+        </span>
       </div>
       <span class="pick">
         <button type="button" :class="{ primary: open === 'import' }" :aria-pressed="open === 'import'" @click="show('import')">

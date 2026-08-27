@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
 import { api, type CheckReport, type CheckViolation, watchChecks } from "../api";
+import Message from "../components/Message.vue";
 import ProjectFields from "../components/ProjectFields.vue";
 import { toast } from "../lib/toasts";
 
@@ -144,7 +145,7 @@ onBeforeUnmount(() => dispose?.());
         </div>
       </div>
 
-      <div class="panels">
+      <div class="panels report">
         <div v-if="report.violations.length === 0" class="panel">
           <div class="panel-body">Clean: this project follows "{{ report.pattern }}".</div>
         </div>
@@ -183,7 +184,7 @@ onBeforeUnmount(() => dispose?.());
                 class="row"
               >
                 <td class="path">{{ violation.path }}</td>
-                <td>{{ violation.message }}</td>
+                <td><Message :text="violation.message" /></td>
                 <td class="actions">
                   <span v-if="violation.fixable" class="badge">fixable</span>
                 </td>

@@ -115,7 +115,11 @@ describe("dolly serve", () => {
 
     const ok = await api("/api/health");
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toEqual({ name: "dolly", version: pkg.version });
+    expect(await ok.json()).toEqual({
+      name: "dolly",
+      version: pkg.version,
+      home: expect.stringMatching(/patterns$/),
+    });
   });
 
   test("ai reports the switch the way `dolly ai status` does", async () => {
@@ -324,6 +328,7 @@ describe("dolly serve", () => {
     expect(plan.steps).toEqual([
       {
         kind: "move",
+        rule: "naming",
         from: "src/MyHelper.ts",
         to: "src/my-helper.ts",
         reason: expect.any(String),

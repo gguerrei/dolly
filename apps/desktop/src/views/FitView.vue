@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { api, type FitReport, type FitStep } from "../api";
+import Message from "../components/Message.vue";
 import ProjectFields from "../components/ProjectFields.vue";
 import { toast } from "../lib/toasts";
 
@@ -182,11 +183,12 @@ const gitLine = computed(() => {
               <template v-for="move in moves" :key="move.from">
                 <tr class="row">
                   <td class="path">{{ move.from }} → {{ move.to }}</td>
-                  <td>{{ move.reason }}</td>
+                  <td><Message :text="move.reason" /></td>
+                  <td class="actions"><span class="badge">{{ move.rule }}</span></td>
                 </tr>
                 <tr v-for="rewrite in move.rewrites" :key="`${rewrite.file}:${rewrite.from}`" class="sub">
                   <td class="path">{{ rewrite.file }}</td>
-                  <td>rewrites <code>"{{ rewrite.from }}"</code> → <code>"{{ rewrite.to }}"</code></td>
+                  <td colspan="2">rewrites <code>"{{ rewrite.from }}"</code> → <code>"{{ rewrite.to }}"</code></td>
                 </tr>
               </template>
             </tbody>
@@ -202,7 +204,7 @@ const gitLine = computed(() => {
             <tbody>
               <tr v-for="fix in fixes" :key="`${fix.path}:${fix.reason}`" class="row">
                 <td class="path">{{ fix.path }}</td>
-                <td>{{ fix.reason }}</td>
+                <td><Message :text="fix.reason" /></td>
                 <td class="actions"><span class="badge">{{ fix.plan.kind }}</span></td>
               </tr>
             </tbody>
@@ -221,7 +223,7 @@ const gitLine = computed(() => {
             <tbody>
               <tr v-for="step in translations" :key="step.from" class="row">
                 <td class="path">{{ step.from }} → {{ step.to }}</td>
-                <td>{{ step.reason }}</td>
+                <td><Message :text="step.reason" /></td>
                 <td class="actions"><span class="badge">{{ step.language }}</span></td>
               </tr>
             </tbody>
@@ -238,7 +240,7 @@ const gitLine = computed(() => {
               <tr v-for="item in report.declined" :key="`${item.path}:${item.message}`" class="row">
                 <td class="path">{{ item.path }}</td>
                 <td>
-                  <div>{{ item.message }}</div>
+                  <div><Message :text="item.message" /></div>
                   <div v-if="item.suggestion" class="note">
                     ai ({{ item.suggestion.model }}) suggests
                     <code>{{ item.suggestion.pick }}</code>

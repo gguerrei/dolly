@@ -151,6 +151,7 @@ a.button {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
   transition:
     background 120ms,
     border-color 120ms,
@@ -350,6 +351,13 @@ input.mono {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* A pattern's name and its description on one baseline. */
+.page-head .title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .sidebar {
@@ -762,6 +770,11 @@ td.path {
   white-space: nowrap;
   width: 1%;
   padding-right: 28px;
+}
+
+/* Check's report: one path column across every rule, so the messages line up. */
+.report td.path {
+  width: 236px;
 }
 
 td.actions {

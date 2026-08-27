@@ -193,7 +193,7 @@ onMounted(load);
         </div>
       </form>
 
-      <div class="two-up">
+      <div :class="on ? 'two-up' : 'stack'">
         <form v-if="on" class="panel" @submit.prevent="saveModel">
           <div class="panel-head"><h3>Model</h3></div>
           <div class="panel-body stack" style="gap: 8px">
@@ -224,7 +224,11 @@ onMounted(load);
             </span>
             <span>
               <strong>Everything else</strong>
-              <span class="muted">is deterministic and calls nothing.</span>
+              <span class="muted">
+                is deterministic and calls nothing.<template v-if="!on">
+                  Keys live in the OS keychain or the environment, never in a config file.
+                </template>
+              </span>
             </span>
           </div>
         </div>

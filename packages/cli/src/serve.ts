@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import {
   AiProviderError,
@@ -122,6 +123,12 @@ interface Context {
   uiAvailable: boolean;
 }
 
+/** A path under the home directory, the way a shell would print it. */
+function tilde(path: string): string {
+  const home = homedir();
+  return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+}
+
 async function handle(request: Request, ctx: Context): Promise<Response> {
   // The rebinding defense: a browser that resolved evil.example to
   // 127.0.0.1 still sends "Host: evil.example".
@@ -151,7 +158,7 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
   const path = url.pathname;
 
   if (path === "/api/health" && request.method === "GET") {
-    return json({ name: "dolly", version: pkg.version });
+    return json({ name: "dolly", version: pkg.version, home: tilde(store.root) });
   }
 
   if (path === "/api/ai" && request.method === "GET") {
