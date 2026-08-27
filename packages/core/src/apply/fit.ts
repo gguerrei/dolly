@@ -39,6 +39,8 @@ export interface FixStep {
 
 export interface MoveStep {
   kind: "move";
+  /** The rule that asked for it: naming or testing. */
+  rule: string;
   from: string;
   /** Trailing "/" marks a directory move, as everywhere in dolly. */
   to: string;
@@ -126,8 +128,8 @@ export async function fitProject(
     declined.push({ path, message, ...(candidates ? { candidates } : {}) });
 
   /** from → proposed move; built first, thinned by every guard below. */
-  const proposals = new Map<string, { to: string; reason: string; dir: boolean }>();
-  const propose = (from: string, to: string, reason: string, dir: boolean) => {
+  const proposals = new Map<string, { rule: string; to: string; reason: string; dir: boolean }>();
+  const propose = (rule: string, from: string, to: string, reason: string, dir: boolean) => {
     if (to === from) {
       decline(from, `${reason}, but no mechanical rename resolves it`);
       return;
@@ -136,7 +138,7 @@ export async function fitProject(
       decline(from, "two rules want to move this; apply this plan, then run fit again");
       return;
     }
-    proposals.set(from, { to, reason, dir });
+    proposals.set(from, { rule, to, reason, dir });
   };
 
   // Layout's stub and config's captured bytes can both aim a create at one
@@ -156,7 +158,7 @@ export async function fitProject(
     }
     if (violation.rule === "naming") {
       const move = namingMove(violation, pattern);
-      if (move) propose(move.from, move.to, violation.message, move.dir);
+      if (move) propose(violation.rule, move.from, move.to, violation.message, move.dir);
       else decline(violation.path, violation.message);
       continue;
     }
@@ -181,7 +183,7 @@ export async function fitProject(
         inventory.files.map((f) => f.path),
         inventory.dirs,
       );
-      if ("to" in move) propose(violation.path, move.to, violation.message, false);
+      if ("to" in move) propose(violation.rule, violation.path, move.to, violation.message, false);
       else decline(violation.path, `${violation.message}: ${move.declined}`, move.candidates);
       continue;
     }
@@ -331,9 +333,10 @@ export async function fitProject(
   for (const [from, { dir }] of sorted) {
     own.set(from, [...(own.get(from) ?? []), ...claim(from, dir, false)]);
   }
-  for (const [from, { to, reason, dir }] of sorted) {
+  for (const [from, { rule, to, reason, dir }] of sorted) {
     steps.push({
       kind: "move",
+      rule,
       from: dir ? `${from}/` : from,
       to: dir ? `${to}/` : to,
       reason,

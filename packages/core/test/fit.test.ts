@@ -67,6 +67,7 @@ describe("fitProject", () => {
     const move = moves(plan)[0] as MoveStep;
     expect(move.from).toBe("src/MyHelper.ts");
     expect(move.to).toBe("src/my-helper.ts");
+    expect(move.rule).toBe("naming");
     const byFile = Object.fromEntries(move.rewrites.map((r) => [r.file, r]));
     // The bare specifier stays bare; the nodenext .js specifier keeps its .js.
     expect(byFile["src/index.ts"]?.to).toBe("./my-helper");
@@ -87,6 +88,7 @@ describe("fitProject", () => {
     expect(moves(plan)).toHaveLength(1);
     const move = moves(plan)[0] as MoveStep;
     expect(move.to).toBe("src/user.test.ts");
+    expect(move.rule).toBe("testing");
     // The moved file's own import re-bases to its new home.
     expect(move.rewrites).toEqual([
       { file: "tests/user.spec.ts", from: "../src/user", to: "./user", target: "src/user.ts" },

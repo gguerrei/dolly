@@ -83,7 +83,7 @@ export interface FitRewrite {
 
 export type FitStep =
   | { kind: "fix"; path: string; reason: string; plan: FitFixPlan }
-  | { kind: "move"; from: string; to: string; reason: string; rewrites: FitRewrite[] }
+  | { kind: "move"; rule: string; from: string; to: string; reason: string; rewrites: FitRewrite[] }
   | {
       kind: "translate";
       from: string;
@@ -213,7 +213,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  health: () => request<{ name: string; version: string }>("/api/health"),
+  health: () => request<{ name: string; version: string; home: string }>("/api/health"),
   ai: () => request<AiStatus>("/api/ai"),
   aiProviders: () => request<AiProviderStatus[]>("/api/ai/providers"),
   /** `dolly ai connect`: the key is verified live before the keychain stores it. */
