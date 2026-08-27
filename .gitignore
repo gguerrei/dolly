@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Tauri desktop build output (added in M5)
+apps/desktop/src-tauri/target/
+
+# Environment and OS noise
+.env
+.env.*
+*.log
+.DS_Store

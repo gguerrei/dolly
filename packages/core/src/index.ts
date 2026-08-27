@@ -1,0 +1,104 @@
+/**
+ * The deliberate public surface of @dolly/core: the contract the CLI (and
+ * later the daemon and GUI) binds to. One entry point per verb; everything
+ * not named here is internal and free to move. Tests reach past this barrel
+ * on purpose.
+ */
+
+// The AI layer's switch and status. Off means null, never an error.
+export {
+  type AiClient,
+  type AiProviderStatus,
+  type AiStatus,
+  AiUsageError,
+  activeAi,
+  aiOff,
+  aiProviders,
+  aiStatus,
+  connectAi,
+  useAi,
+} from "./ai/ai";
+export { draftConventions } from "./ai/conventions";
+export { assistedFit } from "./ai/placement";
+export { AiProviderError, type AiRequest, PROVIDERS, type ProviderId } from "./ai/providers";
+export { assistedFitApply } from "./ai/translation";
+// Operations: the future daemon's RPC surface
+export {
+  applyFitPlan,
+  type DeclinedItem,
+  type FitApplyResult,
+  FitGitError,
+  type FitPlan,
+  type FitStep,
+  fitApply,
+  fitProject,
+  gitStateOf,
+  type MoveStep,
+  type PlacementSuggestion,
+  type TranslateStep,
+  type Translator,
+} from "./apply/fit";
+export { type ScaffoldReport, scaffoldProject, TargetNotEmptyError } from "./apply/new";
+export { type CheckReport, checkProject, watchProject } from "./check/check";
+export type { FixPlan } from "./check/fix";
+export type { RuleId, Violation } from "./check/rule";
+export {
+  exportBundle,
+  InvalidBundleError,
+  importBundle,
+  PatternExistsError,
+} from "./export/bundle";
+export {
+  EXPORT_TARGETS,
+  ExportExistsError,
+  type ExportTarget,
+  exportPattern,
+  type RenderedExport,
+  renderExport,
+  type TextTarget,
+} from "./export/export";
+export { type ExtractResult, extractPattern, saveExtractedPattern } from "./extract/extract";
+export {
+  draftDocument,
+  type LearningWatch,
+  learnDrift,
+  type Proposal,
+  pathLabel,
+  renderProposal,
+  saveLearned,
+  UnsafePatternPathError,
+  watchLearning,
+} from "./learn/learn";
+export { MARKER_FILE, readPatternMarker } from "./marker";
+// Pattern model
+export {
+  type PatternDocument,
+  PatternParseError,
+  parsePatternDocument,
+  serializePatternDocument,
+} from "./pattern/document";
+export {
+  type CaseStyle,
+  type Commands,
+  type Commits,
+  type Dependencies,
+  facetNames,
+  isSafePatternPath,
+  type Languages,
+  type LayoutEntry,
+  type Naming,
+  type Pattern,
+  patternSchema,
+  type Releases,
+  type Scaffold,
+  type Testing,
+  type Toolchain,
+} from "./pattern/schema";
+// Storage
+export {
+  dollyHome,
+  InvalidPatternNameError,
+  PatternNotFoundError,
+  PatternStore,
+  type PatternSummary,
+} from "./store";

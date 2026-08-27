@@ -1,0 +1,24 @@
+{
+  "name": "dolly-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dolly": "bun packages/cli/src/main.ts",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.0",
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "bun": ">=1.2"
+  }
+}
