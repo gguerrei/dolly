@@ -39,17 +39,29 @@ the button is absent and paths are typed.
 
 ```sh
 bun run tauri dev     # builds the webview, compiles the shell, opens the window
-bun run tauri build   # produces installable bundles (deb/rpm/AppImage)
+bun run tauri build   # produces installable bundles (.app and .dmg on macOS, deb/rpm/AppImage on Linux)
 ```
 
-It needs the Rust toolchain and webkit system libraries; on Linux
-(Debian/Ubuntu/Pop!_OS):
+It needs the Rust toolchain and the platform's webview libraries. On macOS
+that is the Xcode Command Line Tools (WebKit ships with the system) and
+rustup; open a new terminal after rustup so `cargo` is on the PATH:
+
+```sh
+xcode-select --install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+On Linux (Debian/Ubuntu/Pop!_OS):
 
 ```sh
 sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
   libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
+
+The icon set under `src-tauri/icons` is generated, not drawn: after a change
+to `assets/app-icon.svg`, run `bun run tauri icon ../../assets/app-icon.svg`
+from this directory (the npm CLI does it without Rust).
 
 The shell spawns the daemon as `bun dolly serve` from the workspace root,
 so it currently presumes a checkout with `bun` on the PATH; bundling a
