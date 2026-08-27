@@ -1,0 +1,361 @@
+import { afterAll, describe, expect, test } from "bun:test";
+import { chmod, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { FitGitError, fitApply, fitProject, type MoveStep } from "../src/apply/fit";
+import { rewriteSpecifiers } from "../src/apply/imports";
+import { checkProject } from "../src/check/check";
+import { renderStem } from "../src/extract/naming";
+import { cleanupTempRoots, freshStore, repo, seed } from "./support";
+
+afterAll(cleanupTempRoots);
+
+async function git(root: string, ...args: string[]): Promise<string> {
+  const child = Bun.spawn(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  const [code, out, err] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  if (code !== 0) throw new Error(`git ${args.join(" ")} failed: ${err}`);
+  return out;
+}
+
+async function gitRepo(files: Record<string, string>): Promise<string> {
+  const root = await repo(files);
+  await git(root, "init", "-q");
+  await git(root, "config", "user.email", "fit@test");
+  await git(root, "config", "user.name", "fit test");
+  await git(root, "add", "-A");
+  await git(root, "commit", "-q", "-m", "before fit");
+  return root;
+}
+
+const moves = (plan: { steps: { kind: string }[] }) =>
+  plan.steps.filter((s): s is MoveStep => s.kind === "move");
+
+describe("renderStem", () => {
+  test("splits humps, separators, and acronym runs", () => {
+    expect(renderStem("MyHTTPServer", "kebab-case")).toBe("my-http-server");
+    expect(renderStem("user_profile", "PascalCase")).toBe("UserProfile");
+    expect(renderStem("my-thing", "snake_case")).toBe("my_thing");
+    expect(renderStem("parseJSON", "camelCase")).toBe("parseJson");
+  });
+});
+
+describe("rewriteSpecifiers", () => {
+  test("one pass: a rewrite's result never re-matches another rewrite's source", () => {
+    const text = 'import a from "../util";\nimport b from "./util";\n';
+    const out = rewriteSpecifiers(text, [
+      { file: "x", from: "../util", to: "./util", target: "util.ts" },
+      { file: "x", from: "./util", to: "./src/util", target: "src/util.ts" },
+    ]);
+    expect(out).toBe('import a from "./util";\nimport b from "./src/util";\n');
+  });
+});
+
+describe("fitProject", () => {
+  test("a naming rename carries every import style along", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({
+      "src/MyHelper.ts": "export const helper = 1;\n",
+      "src/index.ts": 'export { helper } from "./MyHelper";\n',
+      "src/deep/user.ts": 'import { helper } from "../MyHelper.js";\nexport const u = helper;\n',
+    });
+    const plan = await fitProject(store, "kebab", root);
+    expect(moves(plan)).toHaveLength(1);
+    const move = moves(plan)[0] as MoveStep;
+    expect(move.from).toBe("src/MyHelper.ts");
+    expect(move.to).toBe("src/my-helper.ts");
+    const byFile = Object.fromEntries(move.rewrites.map((r) => [r.file, r]));
+    // The bare specifier stays bare; the nodenext .js specifier keeps its .js.
+    expect(byFile["src/index.ts"]?.to).toBe("./my-helper");
+    expect(byFile["src/deep/user.ts"]?.to).toBe("../my-helper.js");
+  });
+
+  test("a separate test moves next to its one source, taking the pattern's name shape", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "colo",
+      testing: { placement: "colocated", filePattern: "{stem}.test.ts" },
+    });
+    const root = await repo({
+      "src/user.ts": "export const user = 1;\n",
+      "tests/user.spec.ts": 'import { user } from "../src/user";\nexport const t = user;\n',
+    });
+    const plan = await fitProject(store, "colo", root);
+    expect(moves(plan)).toHaveLength(1);
+    const move = moves(plan)[0] as MoveStep;
+    expect(move.to).toBe("src/user.test.ts");
+    // The moved file's own import re-bases to its new home.
+    expect(move.rewrites).toEqual([
+      { file: "tests/user.spec.ts", from: "../src/user", to: "./user", target: "src/user.ts" },
+    ]);
+  });
+
+  test("a colocated test moves under the one existing test root, src/ stripped", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "sep", testing: { placement: "separate" } });
+    const root = await repo({
+      "src/thing.ts": "export const thing = 1;\n",
+      "src/thing.test.ts": 'import { thing } from "./thing";\nexport const t = thing;\n',
+      "tests/other.test.ts": "export {};\n",
+    });
+    const plan = await fitProject(store, "sep", root);
+    const move = moves(plan).find((m) => m.from === "src/thing.test.ts");
+    expect(move?.to).toBe("tests/thing.test.ts");
+    expect(move?.rewrites[0]?.to).toBe("../src/thing");
+  });
+
+  test("an ambiguous destination declines with its reason instead of guessing", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "colo", testing: { placement: "colocated" } });
+    const root = await repo({
+      "src/a/user.ts": "export const a = 1;\n",
+      "src/b/user.ts": "export const b = 1;\n",
+      "tests/user.test.ts": "export {};\n",
+    });
+    const plan = await fitProject(store, "colo", root);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain("2 files named user.ts");
+    // The decline enumerates the destinations it refused to pick between;
+    // that list is the whole opening the AI layer gets.
+    const ambiguous = plan.declined.find((d) => d.candidates);
+    expect(ambiguous?.candidates).toEqual(["src/a/user.test.ts", "src/b/user.test.ts"]);
+  });
+
+  test("several test roots decline with their candidate destinations enumerated", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "sep", testing: { placement: "separate" } });
+    const root = await repo({
+      "src/thing.ts": "export const thing = 1;\n",
+      "src/thing.test.ts": 'import { thing } from "./thing";\nexport const t = thing;\n',
+      "tests/keep.test.ts": "export {};\n",
+      "test/also.test.ts": "export {};\n",
+    });
+    const plan = await fitProject(store, "sep", root);
+    const item = plan.declined.find((d) => d.message.includes("several test roots"));
+    expect(item?.candidates).toEqual(["test/thing.test.ts", "tests/thing.test.ts"]);
+  });
+
+  test("a rename whose target already exists declines instead of clobbering", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({
+      "src/MyHelper.ts": "export const a = 1;\n",
+      "src/my-helper.ts": "export const b = 1;\n",
+    });
+    const plan = await fitProject(store, "kebab", root);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain("already exists");
+  });
+
+  test("a move outside the import ledger's languages declines: no accounting, no move", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "snakes", naming: { files: "snake_case" } });
+    const root = await repo({
+      "pkg/__init__.py": "from .coreParams import x\n",
+      "pkg/coreParams.py": "x = 1\n",
+    });
+    const plan = await fitProject(store, "snakes", root);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain(
+      "cannot yet account for references to .py files",
+    );
+  });
+
+  test("blind importer types in the tree make every move unaccountable", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({
+      "src/MyHelper.ts": "export const helper = 1;\n",
+      "src/App.vue": "<script setup>import { helper } from './MyHelper';</script>\n",
+    });
+    const plan = await fitProject(store, "kebab", root);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain(
+      ".vue files whose imports dolly cannot yet read",
+    );
+  });
+
+  test("a test the pattern's own layout demands in place is a contradiction, not a move", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "contradictory",
+      testing: { placement: "separate" },
+      layout: [{ path: "examples/{name}/demo.test.ts", required: true }],
+    });
+    const root = await repo({
+      "examples/basic/demo.test.ts": "export {};\n",
+      "tests/other.test.ts": "export {};\n",
+    });
+    const plan = await fitProject(store, "contradictory", root);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain(
+      "the pattern's layout demands",
+    );
+  });
+
+  test("a rename keeps the affixes check never judged", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({ "src/MyThing_test.ts": "export {};\n" });
+    const plan = await fitProject(store, "kebab", root);
+    // normalizeStem judged "MyThing"; the _test suffix survives the rename,
+    // so the file stays a test to every tool that greps for one.
+    expect((moves(plan)[0] as MoveStep).to).toBe("src/my-thing_test.ts");
+  });
+
+  test("a .js specifier resolving a .tsx file keeps its .js on rewrite", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({
+      "src/MyButton.tsx": "export const b = 1;\n",
+      "src/app.ts": 'export { b } from "./MyButton.js";\n',
+    });
+    const plan = await fitProject(store, "kebab", root);
+    expect((moves(plan)[0] as MoveStep).rewrites[0]?.to).toBe("./my-button.js");
+  });
+
+  test("a move may not land on a path the plan's own fix step creates", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "clash",
+      naming: { files: "kebab-case" },
+      layout: [{ path: "src/my-helper.ts", required: true }],
+    });
+    const root = await repo({ "src/MyHelper.ts": "export const a = 1;\n" });
+    const plan = await fitProject(store, "clash", root);
+    // Layout plans a create at src/my-helper.ts; the rename may not land there.
+    expect(plan.steps.some((s) => s.kind === "fix" && s.path === "src/my-helper.ts")).toBe(true);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain("two steps collide");
+  });
+
+  test("a destination the inventory cannot see (gitignored) still collides", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({
+      "src/MyConfig.ts": "export const a = 1;\n",
+      "src/my-config.ts": "generated\n",
+      ".gitignore": "src/my-config.ts\n",
+    });
+    const plan = await fitProject(store, "kebab", root);
+    expect(moves(plan)).toHaveLength(0);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain("already exists");
+  });
+
+  test("a file move into a directory the same plan renames away waits", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "twist",
+      naming: { directories: "PascalCase" },
+      testing: { placement: "separate" },
+    });
+    const root = await repo({
+      "App/user.ts": "export const u = 1;\n",
+      "App/user.test.ts": 'import { u } from "./user";\nexport const t = u;\n',
+      "test/helpers.test.ts": "export {};\n",
+    });
+    const plan = await fitProject(store, "twist", root);
+    // The dir rename test/ → Test/ proceeds; the file move into test/ waits.
+    expect(moves(plan).map((m) => m.from)).toEqual(["test/"]);
+    expect(plan.declined.map((d) => d.message).join("\n")).toContain(
+      "being renamed in this same plan",
+    );
+  });
+
+  test("a monorepo's nearest test root beats any top-level rule", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "mono", testing: { placement: "separate" } });
+    const root = await repo({
+      "packages/api/src/user.ts": "export const u = 1;\n",
+      "packages/api/src/user.test.ts": 'import { u } from "./user";\nexport const t = u;\n',
+      "packages/api/tests/setup.test.ts": "export {};\n",
+    });
+    const plan = await fitProject(store, "mono", root);
+    expect((moves(plan)[0] as MoveStep).to).toBe("packages/api/tests/user.test.ts");
+  });
+
+  test("check's fixable violations ride along as fix steps", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "lic", license: "MIT" });
+    const root = await repo({ "src/index.ts": "export {};\n" });
+    const plan = await fitProject(store, "lic", root);
+    const fix = plan.steps.find((s) => s.kind === "fix");
+    expect(fix?.kind === "fix" && fix.plan.kind).toBe("create");
+    expect(fix?.path).toBe("LICENSE");
+  });
+});
+
+describe("fitApply", () => {
+  test("refuses a dirty tree, and a tree with no git at all", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const bare = await repo({ "src/MyHelper.ts": "export {};\n" });
+    expect(fitApply(store, "kebab", bare)).rejects.toThrow(FitGitError);
+    const dirty = await gitRepo({ "src/MyHelper.ts": "export {};\n" });
+    await writeFile(join(dirty, "scratch.txt"), "uncommitted\n");
+    expect(fitApply(store, "kebab", dirty)).rejects.toThrow("dirty");
+  });
+
+  test("a half-applied tree is never committed", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    // One step that will land (the env append) and one that will fail (the
+    // rename, into a read-only directory): a partial apply, the worst case.
+    const root = await gitRepo({
+      "src/MyHelper.ts": "export const h = 1;\n",
+      ".env": "SECRET=1\n",
+      ".gitignore": "node_modules/\n",
+    });
+    const before = (await git(root, "rev-parse", "HEAD")).trim();
+    await chmod(join(root, "src"), 0o555);
+    try {
+      const result = await fitApply(store, "kebab", root);
+      expect(result.applied.length).toBeGreaterThan(0);
+      expect(result.failures.join("\n")).toContain("not committed");
+      expect(result.committed).toBe(false);
+      expect((await git(root, "rev-parse", "HEAD")).trim()).toBe(before);
+    } finally {
+      await chmod(join(root, "src"), 0o755);
+    }
+  });
+
+  test("the acceptance loop: apply → clean check → plans nothing → checkpoint restores", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "shape",
+      naming: { files: "kebab-case" },
+      testing: { placement: "colocated", filePattern: "{stem}.test.ts" },
+      license: "MIT",
+    });
+    const root = await gitRepo({
+      "src/MyHelper.ts": "export const helper = 1;\n",
+      "src/index.ts": 'export { helper } from "./MyHelper";\n',
+      "src/widget.ts": "export const widget = 2;\n",
+      "tests/widget.spec.ts": 'import { widget } from "../src/widget";\nexport const t = widget;\n',
+    });
+
+    const result = await fitApply(store, "shape", root);
+    expect(result.failures).toEqual([]);
+    expect(result.checkpoint).toBe("dolly/fit-shape-1");
+
+    // The tree now is what the pattern says.
+    expect(await Bun.file(join(root, "src/my-helper.ts")).exists()).toBe(true);
+    expect(await Bun.file(join(root, "src/index.ts")).text()).toContain('"./my-helper"');
+    expect(await Bun.file(join(root, "src/widget.test.ts")).text()).toContain('"./widget"');
+    expect(await Bun.file(join(root, "LICENSE")).exists()).toBe(true);
+
+    const after = await checkProject(store, "shape", root);
+    expect(after.violations).toEqual([]);
+    const again = await fitProject(store, "shape", root);
+    expect(again.steps).toEqual([]);
+
+    // Fully revertible: the checkpoint branch holds the pre-fit tree.
+    await git(root, "switch", "-q", result.checkpoint);
+    expect(await Bun.file(join(root, "src/MyHelper.ts")).exists()).toBe(true);
+    expect(await Bun.file(join(root, "src/my-helper.ts")).exists()).toBe(false);
+    expect(await Bun.file(join(root, "LICENSE")).exists()).toBe(false);
+  });
+});

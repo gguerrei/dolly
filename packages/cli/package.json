@@ -1,0 +1,14 @@
+{
+  "name": "@dolly/cli",
+  "version": "0.1.0-dev",
+  "private": true,
+  "type": "module",
+  "description": "dolly on the command line.",
+  "bin": {
+    "dolly": "./src/main.ts"
+  },
+  "dependencies": {
+    "@dolly/core": "workspace:*",
+    "commander": "^14.0.0"
+  }
+}
