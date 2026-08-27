@@ -296,12 +296,13 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
   }
 
   if (path === "/api/export" && request.method === "GET") {
-    // The preview: the rendered file, a pure function of the pattern.
+    // The preview: the rendered file, a pure function of the pattern, named
+    // outright or read from a directory's marker.
     const dir = url.searchParams.get("dir");
     const target = textTarget(url.searchParams.get("as"));
-    if (!dir) return json({ error: "`dir` is required: the project to export into." }, 400);
     if (!target) return json({ error: targetHint() }, 400);
-    const name = await resolvePattern(url.searchParams.get("pattern") ?? undefined, dir);
+    const explicit = url.searchParams.get("pattern") ?? undefined;
+    const name = explicit ?? (dir ? await readPatternMarker(dir) : undefined);
     if (!name) return markerHint();
     return json({ pattern: name, ...renderExport(await store.load(name), target) });
   }
@@ -345,7 +346,7 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     return json({
       name: pattern.name,
       facets: facetNames(pattern),
-      captured: Object.keys(result.files).length,
+      captured: Object.keys(result.files).filter((file) => file.startsWith("toolchain/")).length,
     });
   }
 

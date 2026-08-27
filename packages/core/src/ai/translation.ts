@@ -86,8 +86,9 @@ function translatorFor(client: AiClient, doc: PatternDocument, root: string): Tr
         "",
         source,
       ].join("\n"),
-      // Room for the whole file back: a translation runs about the source's length.
-      maxTokens: Math.min(32_000, 2_000 + Math.ceil(step.bytes / 2)),
+      // Room for the whole file back, after whatever reasoning the model spends first:
+      // a translation runs about the source's length, and the budget holds both.
+      maxTokens: Math.min(32_000, 8_000 + step.bytes),
     });
     return wholeFile(reply);
   };

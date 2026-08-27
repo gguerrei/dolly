@@ -27,7 +27,7 @@ dolly is a local-first tool that captures how a project is organized, from lint 
 - **`dolly check`**: lint-like enforcement. Ten rules verify the project against its pattern (via the marker or by name), `--fix` applies the safe autofixes (create, append, merge, never delete), and `--watch` re-runs on every change. Captured configs bind as *subsets* by default, so your project can extend a config without dolly bleating; a built-in hygiene rule flags a `.env` that isn't gitignored
 - **`dolly fit`**: the migration planner, covering everything check can fix plus the moves and renames it refuses, planned as a dry-run preview down to the exact relative-import rewrites each move needs. `--apply` requires a clean git tree, records a checkpoint branch (`git switch` back is the undo), and commits the result; a move fit can't account for is declined with its reason, never half-applied
 - **`dolly ai`** and **`dolly learn`**: the optional, bring-your-own-key AI layer (Anthropic, OpenAI, or Google; keys in the OS keychain) and its three consumers. With AI on, fit labels a suggestion on the file moves it could not decide alone, and translates files written in a language the pattern does not sanction: one model call per file under `--apply`, judged by the pattern's own typecheck and test commands before any source is removed or committed. `dolly learn` watches a project and turns what changes into pattern edits you review as a diff, one at a time; the facet half of that needs no model at all, and with AI on the model also drafts convention lines from the files that changed
-- **`dolly serve` + GUI**: a local, token-gated daemon serving a browser GUI where you browse the pattern library, view and edit patterns (validated on save), run check from a dashboard (fixes and live watch included), plan and apply fits, review what learn proposes, export a pattern into a project with the file in sight, and (with the native shell's pickers, or a typed path) extract, scaffold, and import without leaving the window. The native Tauri shell comes later and wraps this same webview and daemon
+- **`dolly serve` + GUI**: a local, token-gated daemon serving a browser GUI where you browse the pattern library, view and edit patterns (validated on save), run check from a dashboard (fixes and live watch included), plan and apply fits, review what learn proposes, export a pattern into a project with the file in sight, and (with the native shell's pickers, or a typed path) extract, scaffold, and import without leaving the window. The native Tauri shell (`apps/desktop/src-tauri`) wraps this same webview and daemon and adds the directory pickers; it still presumes a checkout with `bun` on the PATH
 - **Local pattern store**: patterns saved on your machine
 - **CLI**: `dolly list`, `show`, `edit` (opens `$EDITOR`, validates on save), `delete`, `home`
 - **Shareable bundles**: `dolly export` packs a pattern into a `.dolly` file anyone can `dolly import`
@@ -37,7 +37,7 @@ dolly is a local-first tool that captures how a project is organized, from lint 
 
 Details and milestones live in [docs/PLAN.md](docs/PLAN.md).
 
-- Native desktop shell (Tauri) around the existing GUI
+- Going public: single-file binaries (`bun build --compile`), npm and Homebrew distribution, Tauri installers with a compiled daemon as a true sidecar, docs visuals, a v0.1.0 release
 
 ## Development
 
@@ -79,7 +79,7 @@ Extraction refuses to guess. Where a project is genuinely inconsistent (mixed fi
 ```
 packages/core   # @dolly/core: the engine (pattern model, extract, new/check/fit, learn, AI adapters)
 packages/cli    # @dolly/cli: the `dolly` command, incl. the `serve` daemon
-apps/desktop    # the GUI webview (Vue 3), served by `dolly serve`; Tauri wrap pending
+apps/desktop    # the GUI webview (Vue 3), served by `dolly serve`, and the Tauri shell (src-tauri/)
 docs/           # plan, ADRs, design notes
 ```
 

@@ -15,6 +15,10 @@ export const layoutRule: Rule = {
     const dirs = new Set(inventory.dirs);
     const projectName = slugify(basename(root), "project");
     const ecosystem = ecosystemOfPattern(pattern);
+    // A captured file is the config rule's to judge (ADR-0003 rule 4): one report per file.
+    const captured = new Set(
+      Object.keys(pattern.toolchain?.configs ?? {}).filter((id) => !id.includes("#")),
+    );
     const violations: Violation[] = [];
 
     for (const entry of pattern.layout) {
@@ -22,7 +26,7 @@ export const layoutRule: Rule = {
         diagnose(`layout entry "${entry.path}" is not a safe relative path; not checked.`);
         continue;
       }
-      if (!entry.required) continue;
+      if (!entry.required || captured.has(entry.path)) continue;
       const isDir = entry.path.endsWith("/");
       const bare = isDir ? entry.path.slice(0, -1) : entry.path;
 
