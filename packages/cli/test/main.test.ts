@@ -374,7 +374,9 @@ describe("dolly CLI", () => {
 
     const agents = await dolly("export", "tidy", "--as", "agents-md");
     expect(agents.exitCode).toBe(0);
-    expect(agents.stdout).toContain(`to ${join(await realpath(home), "AGENTS.md")}`); // tmp is a symlink on macOS
+    // Compared through realpath: tmp is a symlink on macOS and a short 8.3 name on Windows.
+    const printed = agents.stdout.match(/ to (.+)$/m)?.[1] ?? "";
+    expect(await realpath(printed)).toBe(await realpath(join(home, "AGENTS.md")));
     const written = await readFile(join(home, "AGENTS.md"), "utf8");
     expect(written).toContain("| test | `bun test` |");
     expect(written).toContain("Be tidy.");

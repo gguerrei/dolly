@@ -624,7 +624,7 @@ async function verifyTranslations(
     const shell = process.platform === "win32" ? ["cmd", "/c", command] : ["sh", "-c", command];
     const child = Bun.spawn(shell, {
       cwd: root,
-      env: { ...process.env, PATH: projectPath(root) },
+      env: { ...process.env, [pathKey()]: projectPath(root) },
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -642,6 +642,11 @@ async function verifyTranslations(
   return { ok, notes };
 }
 
+/** The environment's own spelling of PATH: Windows may say Path, and a second key would be ignored. */
+function pathKey(): string {
+  return Object.keys(process.env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+}
+
 /** The project's own bins ahead of the caller's PATH, so `tsc` or `ruff` resolve as they do for its author. */
 function projectPath(root: string): string {
   const own = [
@@ -649,7 +654,7 @@ function projectPath(root: string): string {
     join(root, ".venv", "bin"),
     join(root, ".venv", "Scripts"), // where a Windows virtualenv keeps them
   ];
-  return [...own, process.env.PATH ?? ""].join(delimiter);
+  return [...own, process.env[pathKey()] ?? ""].join(delimiter);
 }
 
 export interface FitApplyResult {
