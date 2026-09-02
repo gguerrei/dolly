@@ -16,8 +16,10 @@ export const licenseRule: Rule = {
     const projectName = slugify(basename(root), "project");
     const violations: Violation[] = [];
 
-    if (atRoot.has("package.json")) {
-      const text = await Bun.file(join(root, "package.json")).text();
+    // The JSON manifests that declare a license: npm's and Composer's.
+    for (const file of ["package.json", "composer.json"]) {
+      if (!atRoot.has(file)) continue;
+      const text = await Bun.file(join(root, file)).text();
       try {
         const manifest = JSON.parse(text) as Record<string, unknown>;
         // The legacy object form `license: { type: "MIT" }` still declares.
@@ -28,17 +30,17 @@ export const licenseRule: Rule = {
               ? manifest.license.type
               : undefined;
         if (declared !== license) {
-          const rewritable = canRewrite("package.json", text);
+          const rewritable = canRewrite(file, text);
           violations.push({
             rule: "license",
-            path: "package.json",
+            path: file,
             message: `${
               declared === undefined
                 ? `has no license field (the pattern says ${license})`
                 : `declares "${declared}", but the pattern says ${license}`
             }${rewritable ? "" : "; the manifest's shape is not one dolly will rewrite, so edit it by hand"}`,
             ...(rewritable
-              ? { fix: { kind: "merge" as const, path: "package.json", value: { license } } }
+              ? { fix: { kind: "merge" as const, path: file, value: { license } } }
               : {}),
           });
         }

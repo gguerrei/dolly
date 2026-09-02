@@ -315,6 +315,82 @@ export async function scanToolchain(
     if (golangci) found("golangci-lint", "linter", "go", golangci, golangci, await read(golangci));
   }
 
+  // --- Ruby -------------------------------------------------------------
+  if (rootFiles.has("Gemfile")) {
+    const gemfile = await read("Gemfile");
+    found("bundler", "packageManager", "rubygems", "Gemfile");
+    const rubocop = firstFile([".rubocop.yml", ".rubocop.yaml"]);
+    if (rubocop) {
+      const contents = await read(rubocop);
+      found("rubocop", "formatter", "rubygems", rubocop, rubocop, contents);
+      found("rubocop", "linter", "rubygems", rubocop, rubocop, contents);
+    }
+    if (rootFiles.has(".rspec") || /\brspec\b/.test(gemfile)) {
+      found("rspec", "testRunner", "rubygems", rootFiles.has(".rspec") ? ".rspec" : "Gemfile");
+    } else if (/\bminitest\b/.test(gemfile) || inventory.dirs.includes("test")) {
+      found("minitest", "testRunner", "rubygems", "Gemfile or test/");
+    }
+  }
+
+  // --- JVM --------------------------------------------------------------
+  const gradleFile = firstFile(["build.gradle.kts", "build.gradle"]);
+  if (rootFiles.has("pom.xml") || gradleFile) {
+    const build = await read(rootFiles.has("pom.xml") ? "pom.xml" : (gradleFile as string));
+    if (rootFiles.has("pom.xml")) found("maven", "packageManager", "maven", "pom.xml");
+    if (gradleFile) found("gradle", "packageManager", "maven", gradleFile);
+    const checkstyle = firstFile(["checkstyle.xml"]);
+    if (checkstyle)
+      found("checkstyle", "linter", "maven", checkstyle, checkstyle, await read(checkstyle));
+    const detekt = firstFile(["detekt.yml", "detekt.yaml"]);
+    if (detekt) found("detekt", "linter", "maven", detekt, detekt, await read(detekt));
+    if (/junit/i.test(build)) found("junit", "testRunner", "maven", "junit in the build file");
+    else if (/kotest/i.test(build))
+      found("kotest", "testRunner", "maven", "kotest in the build file");
+  }
+
+  // --- PHP --------------------------------------------------------------
+  if (rootFiles.has("composer.json")) {
+    const composer = (await readJsonSafe(join(inventory.root, "composer.json"))) ?? {};
+    const devRequires = Object.keys(
+      (composer["require-dev"] as Record<string, string> | undefined) ?? {},
+    );
+    found("composer", "packageManager", "composer", "composer.json");
+    const fixer = firstFile([".php-cs-fixer.dist.php", ".php-cs-fixer.php"]);
+    if (fixer) found("php-cs-fixer", "formatter", "composer", fixer, fixer, await read(fixer));
+    else if (rootFiles.has("pint.json"))
+      found("pint", "formatter", "composer", "pint.json", "pint.json", await read("pint.json"));
+    const phpstan = firstFile(["phpstan.neon", "phpstan.neon.dist", "phpstan.dist.neon"]);
+    if (phpstan) found("phpstan", "linter", "composer", phpstan, phpstan, await read(phpstan));
+    const psalm = firstFile(["psalm.xml", "psalm.xml.dist"]);
+    if (psalm) found("psalm", "linter", "composer", psalm, psalm, await read(psalm));
+    const phpunit = firstFile(["phpunit.xml", "phpunit.xml.dist", "phpunit.dist.xml"]);
+    if (devRequires.includes("pestphp/pest"))
+      found("pest", "testRunner", "composer", "pestphp/pest in require-dev");
+    else if (phpunit)
+      found("phpunit", "testRunner", "composer", phpunit, phpunit, await read(phpunit));
+    else if (devRequires.includes("phpunit/phpunit"))
+      found("phpunit", "testRunner", "composer", "phpunit/phpunit in require-dev");
+  }
+
+  // --- .NET -------------------------------------------------------------
+  const projectFiles = inventory.files.filter((f) => /\.(csproj|fsproj|vbproj)$/i.test(f.path));
+  if (projectFiles.length > 0) {
+    found("nuget", "packageManager", "nuget", projectFiles[0]?.path as string);
+    found("dotnet-format", "formatter", "nuget", ".NET SDK default");
+    const sources = await Promise.all(projectFiles.map((f) => read(f.path)));
+    const references = sources.join("\n");
+    for (const [runner, id] of [
+      ["xunit", "xunit"],
+      ["nunit", "NUnit"],
+      ["mstest", "MSTest.TestFramework"],
+    ] as const) {
+      if (new RegExp(`Include="${id}"`, "i").test(references)) {
+        found(runner, "testRunner", "nuget", `${id} referenced by a project`);
+        break;
+      }
+    }
+  }
+
   // --- Cross-ecosystem --------------------------------------------------
   for (const runner of ["make", "just"] as const) {
     const taskfile = firstFile(TASKFILE_NAMES[runner]);

@@ -46,10 +46,15 @@ M3; reviewed by a five-dimension adversarial audit (2026-07-24).
   last resort; a template dropped for a captured config says so in a note
   rather than vanishing. A template for a per-resource path waits until there
   is a resource to name it after.
-- **Base manifest.** package.json / pyproject.toml / Cargo.toml / go.mod with
-  name, 0.1.0, the license id, runtime pins (engines, requires-python,
-  rust-version), and the commands facet as scripts, or as a justfile/Makefile
-  when that is the pattern's task runner. Version pins are normalized to what
+- **Base manifest.** package.json / pyproject.toml / Cargo.toml / go.mod, and
+  since 2026-09-01 a Gemfile, a pom.xml (or build.gradle.kts with its
+  settings file when the pattern says Gradle), a composer.json, or a .csproj
+  named after the project, with name, 0.1.0, the license id, runtime pins
+  (engines, requires-python, rust-version, `ruby`, the Java release, the PHP
+  floor, the .NET target framework from the SDK pin), and the commands facet
+  as scripts, or as a justfile/Makefile when that is the pattern's task
+  runner. Maven and Gradle add no dependency from the command line, so those
+  installs are printed as lines to add to the build file. Version pins are normalized to what
   each field actually parses: `requires-python` gains the operator a specifier
   needs (`3.12` → `>=3.12`), while `go` and `rust-version` lose one they
   cannot carry (`>=1.21` → `1.21`).

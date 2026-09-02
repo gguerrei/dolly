@@ -7,7 +7,15 @@
  * are deliberately absent: the toolchain facet owns tool identity (ADR-0003)
  * and the dependencies facet mirrors its winners.
  */
-export type Ecosystem = "npm" | "pypi" | "cargo" | "go";
+export type Ecosystem =
+  | "npm"
+  | "pypi"
+  | "cargo"
+  | "go"
+  | "rubygems"
+  | "maven"
+  | "composer"
+  | "nuget";
 
 /** Which ecosystem a sanctioned language implies (extract and new share this). */
 export const ECOSYSTEM_BY_LANGUAGE: Record<string, Ecosystem> = {
@@ -19,15 +27,48 @@ export const ECOSYSTEM_BY_LANGUAGE: Record<string, Ecosystem> = {
   Python: "pypi",
   Rust: "cargo",
   Go: "go",
+  Ruby: "rubygems",
+  Java: "maven",
+  Kotlin: "maven",
+  PHP: "composer",
+  "C#": "nuget",
+  "F#": "nuget",
 };
 
-/** The manifest file that identifies each ecosystem. */
+/**
+ * The manifest file that identifies each ecosystem. A .NET project file is
+ * named after the project, so `{name}` stands for it; `isManifestName`
+ * recognizes the real thing.
+ */
 export const MANIFEST_OF: Record<Ecosystem, string> = {
   npm: "package.json",
   pypi: "pyproject.toml",
   cargo: "Cargo.toml",
   go: "go.mod",
+  rubygems: "Gemfile",
+  maven: "pom.xml",
+  composer: "composer.json",
+  nuget: "{name}.csproj",
 };
+
+/** Gradle keeps the Maven ecosystem's manifest in its own files. */
+export const GRADLE_FILES = [
+  "build.gradle.kts",
+  "build.gradle",
+  "settings.gradle.kts",
+  "settings.gradle",
+];
+
+const DOTNET_PROJECT = /\.(csproj|fsproj|vbproj|sln|slnx)$/i;
+
+/** A root manifest by name: a project decision new and check never invent (ADR-0003). */
+export function isManifestName(name: string): boolean {
+  return (
+    Object.values(MANIFEST_OF).includes(name) ||
+    GRADLE_FILES.includes(name) ||
+    DOTNET_PROJECT.test(name)
+  );
+}
 
 /** Root files that imply an ecosystem when no sanctioned language does. */
 const ECOSYSTEM_BY_ROOT_FILE: [string, Ecosystem][] = [
@@ -38,6 +79,11 @@ const ECOSYSTEM_BY_ROOT_FILE: [string, Ecosystem][] = [
   ["setup.py", "pypi"],
   ["Cargo.toml", "cargo"],
   ["go.mod", "go"],
+  ["Gemfile", "rubygems"],
+  ["pom.xml", "maven"],
+  ["build.gradle.kts", "maven"],
+  ["build.gradle", "maven"],
+  ["composer.json", "composer"],
 ];
 
 /**
@@ -51,7 +97,10 @@ export function ecosystemOf(programming: string[], rootPaths: Set<string>): Ecos
     const ecosystem = ECOSYSTEM_BY_LANGUAGE[language];
     if (ecosystem) return ecosystem;
   }
-  return ECOSYSTEM_BY_ROOT_FILE.find(([file]) => rootPaths.has(file))?.[1];
+  const byFile = ECOSYSTEM_BY_ROOT_FILE.find(([file]) => rootPaths.has(file))?.[1];
+  if (byFile) return byFile;
+  // A .NET solution or project file carries the project's own name.
+  return [...rootPaths].some((file) => DOTNET_PROJECT.test(file)) ? "nuget" : undefined;
 }
 
 /**
@@ -269,5 +318,149 @@ export const REGISTRY: Record<Ecosystem, Record<string, Purpose>> = {
     "github.com/go-playground/validator": "validation",
     "google.golang.org/protobuf": "serialization",
     "github.com/stretchr/testify": "mock",
+  },
+  rubygems: {
+    faraday: "http-client",
+    httparty: "http-client",
+    rails: "web-framework",
+    sinatra: "web-framework",
+    hanami: "web-framework",
+    roda: "web-framework",
+    activerecord: "orm",
+    sequel: "orm",
+    rom: "orm",
+    pg: "db-driver",
+    mysql2: "db-driver",
+    sqlite3: "db-driver",
+    redis: "cache",
+    sidekiq: "queue",
+    good_job: "queue",
+    "dry-validation": "validation",
+    oj: "serialization",
+    multi_json: "serialization",
+    logger: "logging",
+    lograge: "logging",
+    thor: "cli",
+    dotenv: "config",
+    "dotenv-rails": "config",
+    erb: "templating",
+    slim: "templating",
+    haml: "templating",
+    jwt: "auth",
+    devise: "auth",
+    i18n: "i18n",
+    redcarpet: "markdown",
+    kramdown: "markdown",
+    yard: "docs",
+    webmock: "mock",
+    vcr: "mock",
+    factory_bot: "mock",
+  },
+  maven: {
+    "com.squareup.okhttp3:okhttp": "http-client",
+    "com.squareup.retrofit2:retrofit": "http-client",
+    "io.ktor:ktor-client-core": "http-client",
+    "org.springframework.boot:spring-boot-starter-web": "web-framework",
+    "org.springframework.boot:spring-boot-starter-webflux": "web-framework",
+    "io.quarkus:quarkus-resteasy": "web-framework",
+    "io.micronaut:micronaut-http-server-netty": "web-framework",
+    "io.ktor:ktor-server-core": "web-framework",
+    "io.javalin:javalin": "web-framework",
+    "org.hibernate.orm:hibernate-core": "orm",
+    "org.hibernate:hibernate-core": "orm",
+    "org.springframework.boot:spring-boot-starter-data-jpa": "orm",
+    "org.jetbrains.exposed:exposed-core": "orm",
+    "org.jooq:jooq": "orm",
+    "org.postgresql:postgresql": "db-driver",
+    "com.mysql:mysql-connector-j": "db-driver",
+    "org.xerial:sqlite-jdbc": "db-driver",
+    "org.flywaydb:flyway-core": "migration",
+    "org.liquibase:liquibase-core": "migration",
+    "redis.clients:jedis": "cache",
+    "io.lettuce:lettuce-core": "cache",
+    "org.apache.kafka:kafka-clients": "queue",
+    "com.rabbitmq:amqp-client": "queue",
+    "jakarta.validation:jakarta.validation-api": "validation",
+    "org.hibernate.validator:hibernate-validator": "validation",
+    "com.fasterxml.jackson.core:jackson-databind": "serialization",
+    "com.google.code.gson:gson": "serialization",
+    "com.squareup.moshi:moshi": "serialization",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json": "serialization",
+    "org.slf4j:slf4j-api": "logging",
+    "ch.qos.logback:logback-classic": "logging",
+    "org.apache.logging.log4j:log4j-core": "logging",
+    "info.picocli:picocli": "cli",
+    "com.github.ajalt.clikt:clikt": "cli",
+    "com.typesafe:config": "config",
+    "io.github.cdimascio:dotenv-java": "config",
+    "org.thymeleaf:thymeleaf": "templating",
+    "org.freemarker:freemarker": "templating",
+    "io.jsonwebtoken:jjwt-api": "auth",
+    "com.auth0:java-jwt": "auth",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": "async-runtime",
+    "org.mockito:mockito-core": "mock",
+    "io.mockk:mockk": "mock",
+    "com.github.tomakehurst:wiremock": "mock",
+  },
+  composer: {
+    "guzzlehttp/guzzle": "http-client",
+    "symfony/http-client": "http-client",
+    "laravel/framework": "web-framework",
+    "symfony/framework-bundle": "web-framework",
+    "slim/slim": "web-framework",
+    "cakephp/cakephp": "web-framework",
+    "doctrine/orm": "orm",
+    "illuminate/database": "orm",
+    "cycle/orm": "orm",
+    "doctrine/dbal": "db-driver",
+    "doctrine/migrations": "migration",
+    "predis/predis": "cache",
+    "php-amqplib/php-amqplib": "queue",
+    "respect/validation": "validation",
+    "symfony/validator": "validation",
+    "symfony/serializer": "serialization",
+    "jms/serializer": "serialization",
+    "monolog/monolog": "logging",
+    "symfony/console": "cli",
+    "vlucas/phpdotenv": "config",
+    "symfony/dotenv": "config",
+    "twig/twig": "templating",
+    "league/plates": "templating",
+    "firebase/php-jwt": "auth",
+    "lcobucci/jwt": "auth",
+    "nesbot/carbon": "datetime",
+    "symfony/translation": "i18n",
+    "league/commonmark": "markdown",
+    "mockery/mockery": "mock",
+    "fakerphp/faker": "mock",
+  },
+  nuget: {
+    "microsoft.aspnetcore.app": "web-framework",
+    "microsoft.aspnetcore.openapi": "web-framework",
+    "microsoft.entityframeworkcore": "orm",
+    dapper: "orm",
+    npgsql: "db-driver",
+    "microsoft.data.sqlclient": "db-driver",
+    "microsoft.data.sqlite": "db-driver",
+    "stackexchange.redis": "cache",
+    masstransit: "queue",
+    "rabbitmq.client": "queue",
+    fluentvalidation: "validation",
+    "newtonsoft.json": "serialization",
+    "system.text.json": "serialization",
+    serilog: "logging",
+    nlog: "logging",
+    "system.commandline": "cli",
+    "spectre.console": "cli",
+    "microsoft.extensions.configuration": "config",
+    dotnetenv: "config",
+    razorlight: "templating",
+    "microsoft.aspnetcore.authentication.jwtbearer": "auth",
+    "system.identitymodel.tokens.jwt": "auth",
+    nodatime: "datetime",
+    markdig: "markdown",
+    moq: "mock",
+    nsubstitute: "mock",
+    bogus: "mock",
   },
 };

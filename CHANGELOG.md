@@ -179,6 +179,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   409 the panel turns into Replace or Keep mine. `facetNames()` joins the
   engine so the CLI and the daemon list a pattern's facets from one place.
 
+- `dolly link <pattern>` writes the `.dolly` marker into a project that
+  already exists (keeping an ignore list already there), and `fit --apply`
+  adds the marker as a create step when it is missing, so a fitted project
+  resolves its pattern by itself from then on. The daemon has it as
+  `POST /api/link`.
+- The marker carries an `ignore:` list: relative paths with `*` and `**`,
+  a directory entry covering everything under it. An ignored violation is
+  neither reported nor fixed by any rule, fit never plans for it, and the
+  report says how many it set aside. A marker that does not parse is a
+  diagnostic, never silence.
+- `dolly check --json` prints the report in the daemon's wire shape (one
+  line per report under `--watch`), for CI and editors.
+- `dolly import` takes an https URL as well as a path, under the same
+  size caps as a file.
+- A `.pre-commit-hooks.yaml` at the repository root, so a project can run
+  `dolly check` before every commit through pre-commit.
+- Four more ecosystems in the toolchain and dependency scanners and in
+  `new`: RubyGems (Gemfile and its groups, bundler, rubocop, rspec or
+  minitest, the ruby pin), the JVM through Maven or Gradle (pom.xml or the
+  build file, checkstyle and detekt configs, junit, the Java release),
+  Composer (composer.json, php-cs-fixer or pint, phpstan or psalm, phpunit
+  or pest, the php floor), and NuGet (every project file in a solution, the
+  test project as dev, xunit, nunit or mstest, the SDK pin). The purpose
+  registry carries the libraries that matter in each, a scaffold from such
+  a pattern writes the right manifest, seeds its test runner, and passes
+  its own check, and `*_spec.rb`, `*Test.php`, and `*Tests.cs` are test
+  shapes the testing facet knows.
+
 ### Changed
 
 - The logo is a solid silhouette now: the same two-headed sheep, drawn as
@@ -257,6 +285,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manager's is, so `new` writes it back, the config rule creates it when
   missing, and the releases rule stands down for a captured one; a
   scaffold from a pattern that names a tool passes its own check again.
+
+- The packages are named for npm: the CLI is `dollysheep` (the command is
+  still `dolly`), the engine `@dollysheep/core`, and the GUI
+  `@dollysheep/desktop`, since `dolly` and `dolly-cli` are taken; the
+  Homebrew formula keeps the name `dolly`.
 
 ### Fixed
 

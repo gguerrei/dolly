@@ -109,7 +109,9 @@ distribution.
 ### Toolchain
 
 A data-driven matrix of rows `(tool, roles, fingerprints, capture spec)` per
-ecosystem (js, python, rust, go, detected from root manifests). Fingerprints
+ecosystem (js, python, rust, go, and since 2026-09-01 ruby, the jvm through
+maven or gradle, php, and .net, detected from root manifests, or from the
+project files a .net solution spreads over directories). Fingerprints
 are dedicated config files, manifest sections, and lockfiles, tested in the
 tool's own resolution order. Roles: packageManager, formatter, linter,
 typechecker, testRunner, taskRunner, ci (exclusive: PM, formatter, testRunner;
@@ -139,7 +141,13 @@ note, never a wrong facet.
 Manifests parsed: package.json (+ workspaces), pyproject.toml
 ([project] / PEP 735 groups / poetry fallback), requirements files (only when
 pyproject declares no dependencies; shadowing is noted), Cargo.toml
-(workspace-aware), go.mod (minus `// indirect`). Internal workspace packages
+(workspace-aware), go.mod (minus `// indirect`), and since 2026-09-01 the
+Gemfile (`gem` lines with their groups; a gemspec is code and stays unread),
+pom.xml (`<dependency>` blocks, test and provided scopes as dev) or a
+Gradle build file (`implementation("group:artifact:version")` and its
+kin), composer.json (require and require-dev, the platform entries
+skipped), and every .csproj in the tree (`<PackageReference>`, a test
+project's as dev, central versions from Directory.Packages.props). Internal workspace packages
 and path/git specifiers are excluded from facets.
 
 Purpose classification (`http-client: httpx`) uses a small curated in-core

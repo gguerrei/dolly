@@ -798,6 +798,216 @@ describe("extract end to end", () => {
     expect(document.pattern.toolchain?.configs["lefthook.yml"]).toBe("toolchain/lefthook.yml");
   });
 
+  const RUBY_REPO: Record<string, string> = {
+    Gemfile: [
+      'source "https://rubygems.org"',
+      "",
+      'ruby "3.3.0"',
+      "",
+      'gem "rails", "~> 7.1"',
+      'gem "pg", ">= 1.5", "< 2"',
+      'gem "sidekiq", "~> 7.0"',
+      "",
+      "group :development, :test do",
+      '  gem "rspec-rails", "~> 6.1"',
+      '  gem "rubocop", "~> 1.60", require: false',
+      "end",
+      "",
+    ].join("\n"),
+    ".rubocop.yml": "AllCops:\n  NewCops: enable\n",
+    ".rspec": "--require spec_helper\n",
+    ".ruby-version": "3.3.0\n",
+    "app/models/user.rb": "class User\nend\n",
+    "app/models/order.rb": "class Order\nend\n",
+    "app/models/invoice.rb": "class Invoice\nend\n",
+    "spec/spec_helper.rb": "RSpec.configure do |c|\nend\n",
+    "spec/models/user_spec.rb": "RSpec.describe User do\nend\n",
+    "spec/models/order_spec.rb": "RSpec.describe Order do\nend\n",
+  };
+
+  test("a Rails repo extracts its Ruby toolchain, gems by purpose, and the ruby pin", async () => {
+    const root = await repo(RUBY_REPO);
+    const { document, files } = await extractPattern(root, "rails-app");
+    const { pattern } = document;
+    expect(pattern.languages?.programming[0]).toBe("Ruby");
+    expect(pattern.languages?.versions).toEqual({ ruby: "3.3.0" });
+    expect(pattern.toolchain).toMatchObject({
+      packageManager: "bundler",
+      formatter: "rubocop",
+      linter: "rubocop",
+      testRunner: "rspec",
+      configs: { ".rubocop.yml": "toolchain/.rubocop.yml" },
+    });
+    expect(files["toolchain/.rubocop.yml"]).toBe("AllCops:\n  NewCops: enable\n");
+    expect(pattern.dependencies).toEqual({
+      runtime: { "db-driver": "pg", queue: "sidekiq", "web-framework": "rails" },
+      dev: { format: "rubocop", lint: "rubocop", test: "rspec" },
+      versionPolicy: "caret",
+    });
+    expect(pattern.testing).toEqual({ placement: "separate", filePattern: "{stem}_spec.rb" });
+  });
+
+  test("a Maven repo extracts its JVM toolchain, artifacts by purpose, and the java release", async () => {
+    const dependency = (group: string, artifact: string, version: string, scope?: string) =>
+      `    <dependency>\n      <groupId>${group}</groupId>\n      <artifactId>${artifact}</artifactId>\n      <version>${version}</version>\n${scope ? `      <scope>${scope}</scope>\n` : ""}    </dependency>\n`;
+    const root = await repo({
+      "pom.xml": [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<project xmlns="http://maven.apache.org/POM/4.0.0">',
+        "  <modelVersion>4.0.0</modelVersion>",
+        "  <groupId>com.acme</groupId>",
+        "  <artifactId>shop</artifactId>",
+        "  <version>1.0.0</version>",
+        "  <properties>",
+        "    <maven.compiler.release>21</maven.compiler.release>",
+        "  </properties>",
+        "  <dependencies>",
+        dependency("org.springframework.boot", "spring-boot-starter-web", "3.2.0") +
+          dependency("com.fasterxml.jackson.core", "jackson-databind", "2.16.0") +
+          dependency("org.postgresql", "postgresql", "42.7.1", "runtime") +
+          dependency("org.junit.jupiter", "junit-jupiter", "5.10.0", "test") +
+          dependency("org.mockito", "mockito-core", "5.8.0", "test") +
+          "  </dependencies>",
+        "</project>",
+        "",
+      ].join("\n"),
+      "checkstyle.xml": '<module name="Checker"/>\n',
+      "src/main/java/com/acme/App.java": "class App {}\n",
+      "src/main/java/com/acme/Shop.java": "class Shop {}\n",
+      "src/test/java/com/acme/AppTest.java": "class AppTest {}\n",
+    });
+    const { document } = await extractPattern(root, "shop");
+    const { pattern } = document;
+    expect(pattern.languages?.programming).toEqual(["Java"]);
+    expect(pattern.languages?.versions).toEqual({ java: "21" });
+    expect(pattern.toolchain).toMatchObject({
+      packageManager: "maven",
+      linter: "checkstyle",
+      testRunner: "junit",
+      configs: { "checkstyle.xml": "toolchain/checkstyle.xml" },
+    });
+    expect(pattern.dependencies).toEqual({
+      runtime: {
+        "db-driver": "org.postgresql:postgresql",
+        serialization: "com.fasterxml.jackson.core:jackson-databind",
+        "web-framework": "org.springframework.boot:spring-boot-starter-web",
+      },
+      dev: { mock: "org.mockito:mockito-core" },
+      versionPolicy: "pinned",
+    });
+  });
+
+  test("a Gradle Kotlin repo reads its build file the way a pom is read", async () => {
+    const root = await repo({
+      "build.gradle.kts": [
+        'plugins { kotlin("jvm") version "2.0.0" }',
+        "repositories { mavenCentral() }",
+        "dependencies {",
+        '    implementation("io.ktor:ktor-server-core:2.3.7")',
+        '    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")',
+        '    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")',
+        '    testImplementation("io.mockk:mockk:1.13.9")',
+        "}",
+        "java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }",
+        "",
+      ].join("\n"),
+      "settings.gradle.kts": 'rootProject.name = "kt"\n',
+      "src/main/kotlin/App.kt": "fun main() {}\n",
+      "src/main/kotlin/Routes.kt": "fun routes() {}\n",
+      "src/test/kotlin/AppTest.kt": "class AppTest\n",
+    });
+    const { pattern } = (await extractPattern(root, "kt")).document;
+    expect(pattern.languages?.programming).toEqual(["Kotlin"]);
+    expect(pattern.languages?.versions).toEqual({ java: "21" });
+    expect(pattern.toolchain).toMatchObject({ packageManager: "gradle", testRunner: "junit" });
+    expect(pattern.dependencies).toEqual({
+      runtime: {
+        "async-runtime": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+        "web-framework": "io.ktor:ktor-server-core",
+      },
+      dev: { mock: "io.mockk:mockk" },
+      versionPolicy: "pinned",
+    });
+  });
+
+  const PHP_REPO: Record<string, string> = {
+    "composer.json": `${JSON.stringify(
+      {
+        name: "acme/shop",
+        require: { php: ">=8.2", "laravel/framework": "^11.0", "guzzlehttp/guzzle": "^7.8" },
+        "require-dev": {
+          "phpunit/phpunit": "^10.5",
+          "phpstan/phpstan": "^1.10",
+          "laravel/pint": "^1.13",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "phpstan.neon": "parameters:\n  level: 6\n",
+    "pint.json": '{\n  "preset": "laravel"\n}\n',
+    "phpunit.xml.dist": "<phpunit/>\n",
+    "src/App.php": "<?php\nfinal class App {}\n",
+    "src/Shop.php": "<?php\nfinal class Shop {}\n",
+    "tests/AppTest.php": "<?php\nfinal class AppTest {}\n",
+  };
+
+  test("a Laravel repo extracts its PHP toolchain, packages by purpose, and the php floor", async () => {
+    const root = await repo(PHP_REPO);
+    const { document, files } = await extractPattern(root, "shop");
+    const { pattern } = document;
+    expect(pattern.languages?.programming).toEqual(["PHP"]);
+    expect(pattern.languages?.versions).toEqual({ php: ">=8.2" });
+    expect(pattern.toolchain).toMatchObject({
+      packageManager: "composer",
+      formatter: "pint",
+      linter: "phpstan",
+      testRunner: "phpunit",
+    });
+    expect(Object.keys(pattern.toolchain?.configs ?? {}).sort()).toEqual([
+      "phpstan.neon",
+      "phpunit.xml.dist",
+      "pint.json",
+    ]);
+    expect(files["toolchain/phpunit.xml.dist"]).toBe("<phpunit/>\n");
+    expect(pattern.dependencies).toEqual({
+      runtime: { "http-client": "guzzlehttp/guzzle", "web-framework": "laravel/framework" },
+      dev: { format: "pint", lint: "phpstan", test: "phpunit" },
+      versionPolicy: "caret",
+    });
+  });
+
+  test("a .NET solution reads every project file, the test project as dev, and the SDK pin", async () => {
+    const project = (body: string) =>
+      `<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n${body}  </PropertyGroup>\n</Project>\n`;
+    const root = await repo({
+      "Shop.sln": "Microsoft Visual Studio Solution File, Format Version 12.00\n",
+      "global.json": '{ "sdk": { "version": "8.0.100" } }\n',
+      "src/Shop/Shop.csproj": project(
+        '  </PropertyGroup>\n  <ItemGroup>\n    <PackageReference Include="Serilog" Version="3.1.1" />\n    <PackageReference Include="Npgsql" Version="8.0.1" />\n  </ItemGroup>\n  <PropertyGroup>\n',
+      ),
+      "tests/Shop.Tests/Shop.Tests.csproj": project(
+        '    <IsTestProject>true</IsTestProject>\n  </PropertyGroup>\n  <ItemGroup>\n    <PackageReference Include="xunit" Version="2.6.6" />\n    <PackageReference Include="Moq" Version="4.20.70" />\n  </ItemGroup>\n  <PropertyGroup>\n',
+      ),
+      "src/Shop/Program.cs": "Console.WriteLine();\n",
+      "src/Shop/Cart.cs": "class Cart {}\n",
+      "tests/Shop.Tests/CartTests.cs": "class CartTests {}\n",
+    });
+    const { pattern } = (await extractPattern(root, "shop")).document;
+    expect(pattern.languages?.programming).toEqual(["C#"]);
+    expect(pattern.languages?.versions).toEqual({ dotnet: "8.0.100" });
+    expect(pattern.toolchain).toMatchObject({
+      packageManager: "nuget",
+      formatter: "dotnet-format",
+      testRunner: "xunit",
+    });
+    expect(pattern.dependencies).toEqual({
+      runtime: { "db-driver": "Npgsql", logging: "Serilog" },
+      dev: { mock: "Moq", test: "xunit" },
+      versionPolicy: "pinned",
+    });
+  });
+
   test("an empty directory extracts an empty but valid pattern", async () => {
     const root = await repo({ "notes.txt": "just a file" });
     const { document } = await extractPattern(root, "empty-ish");
