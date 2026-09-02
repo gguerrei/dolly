@@ -5,9 +5,14 @@ import Message from "../components/Message.vue";
 import ProjectFields from "../components/ProjectFields.vue";
 import { toast } from "../lib/toasts";
 
+/** How much of a fix's patch shows before its own Show all, as in the CLI. */
+const PREVIEW_LINES = 12;
+
 const dir = ref(""); // remembered by ProjectFields
 const patternName = ref("");
 const report = ref<FitReport | null>(null);
+/** The fixes whose whole patch is open, by path. */
+const opened = ref<Record<string, boolean>>({});
 const error = ref("");
 const busy = ref(false);
 const checkpoint = ref("");
@@ -69,6 +74,22 @@ const fixes = computed(() =>
   (report.value?.steps ?? []).filter((s): s is Extract<FitStep, { kind: "fix" }> => s.kind === "fix"),
 );
 const rewriteCount = computed(() => moves.value.reduce((n, move) => n + move.rewrites.length, 0));
+
+/** A fix's patch as lines the template can mark up. */
+function patchLines(fix: Extract<FitStep, { kind: "fix" }>): { kind: "add" | "del" | "ctx"; text: string }[] {
+  return fix.preview
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line) => ({
+      kind: line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : "ctx",
+      text: line,
+    }));
+}
+
+function shownPatch(fix: Extract<FitStep, { kind: "fix" }>) {
+  const lines = patchLines(fix);
+  return opened.value[fix.path] ? lines : lines.slice(0, PREVIEW_LINES);
+}
 const translations = computed(() =>
   (report.value?.steps ?? []).filter(
     (s): s is Extract<FitStep, { kind: "translate" }> => s.kind === "translate",
@@ -202,11 +223,27 @@ const gitLine = computed(() => {
           </div>
           <table>
             <tbody>
-              <tr v-for="fix in fixes" :key="`${fix.path}:${fix.reason}`" class="row">
-                <td class="path">{{ fix.path }}</td>
-                <td><Message :text="fix.reason" /></td>
-                <td class="actions"><span class="badge">{{ fix.plan.kind }}</span></td>
-              </tr>
+              <template v-for="fix in fixes" :key="`${fix.path}:${fix.reason}`">
+                <tr class="row">
+                  <td class="path">{{ fix.path }}</td>
+                  <td><Message :text="fix.reason" /></td>
+                  <td class="actions"><span class="badge">{{ fix.plan.kind }}</span></td>
+                </tr>
+                <tr v-if="fix.preview" class="sub">
+                  <td class="path"></td>
+                  <td colspan="2">
+                    <pre class="diff"><span v-for="(line, index) in shownPatch(fix)" :key="index" :class="`ln ${line.kind}`">{{ line.text }}</span></pre>
+                    <button
+                      v-if="patchLines(fix).length > PREVIEW_LINES"
+                      class="ghost small"
+                      type="button"
+                      @click="opened[fix.path] = !opened[fix.path]"
+                    >
+                      {{ opened[fix.path] ? "Show fewer" : `Show all ${patchLines(fix).length} lines` }}
+                    </button>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>

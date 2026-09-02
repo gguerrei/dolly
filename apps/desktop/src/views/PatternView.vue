@@ -4,12 +4,15 @@ import { api, type PatternDetail, type ScaffoldReport } from "../api";
 import CodeEditor from "../components/CodeEditor.vue";
 import FacetChips from "../components/FacetChips.vue";
 import PathField from "../components/PathField.vue";
+import { renderMarkdown } from "../lib/markdown";
 import { toast } from "../lib/toasts";
 
 const props = defineProps<{ name: string }>();
 
 /** A layout longer than this folds; the panel's footer unfolds it. */
 const LAYOUT_FOLD = 10;
+/** Prose with more extraction notes than this folds the same way. */
+const PROSE_FOLD = 3;
 
 const detail = ref<PatternDetail | null>(null);
 const loading = ref(true);
@@ -19,6 +22,7 @@ const buffer = ref("");
 const saveError = ref("");
 const saving = ref(false);
 const showAllLayout = ref(false);
+const showAllProse = ref(false);
 
 async function load(): Promise<void> {
   loadError.value = "";
@@ -159,6 +163,11 @@ const releasesLine = computed(() => {
   if (!releases) return "";
   return [releases.versioning, releases.changelog, releases.tool].filter(Boolean).join("; ");
 });
+
+/** The conventions rendered from their markdown, through the renderer that escapes everything first. */
+const renderedProse = computed(() => renderMarkdown(detail.value?.prose ?? ""));
+const noteCount = computed(() => ((detail.value?.prose ?? "").match(/^\s*[-*+]\s/gm) ?? []).length);
+const proseFolded = computed(() => noteCount.value > PROSE_FOLD && !showAllProse.value);
 
 /** The overview exists only for a source that parses; a broken pattern stays in the editor. */
 const reading = computed(() => mode.value === "read" && pattern.value !== undefined);
@@ -340,9 +349,15 @@ onMounted(load);
           </div>
 
           <div v-if="detail.prose" class="panel">
-            <div class="panel-head"><h3>Conventions</h3></div>
-            <div class="panel-body">
-              <pre class="prose">{{ detail.prose }}</pre>
+            <div class="panel-head">
+              <h3>Conventions</h3>
+              <span v-if="noteCount" class="count">{{ noteCount }} extraction note{{ noteCount === 1 ? "" : "s" }}</span>
+            </div>
+            <div class="prose" :class="{ folded: proseFolded }" v-html="renderedProse"></div>
+            <div v-if="noteCount > PROSE_FOLD" class="panel-body">
+              <button class="ghost small" type="button" @click="showAllProse = !showAllProse">
+                {{ showAllProse ? "Show fewer" : `Show all ${noteCount} notes` }}
+              </button>
             </div>
           </div>
         </div>

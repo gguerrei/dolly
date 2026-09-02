@@ -1098,12 +1098,88 @@ tr.sub td.path {
   font-size: 12px;
 }
 
+/* The conventions panel: pattern.md's body rendered. Headings take the
+   panel's own vocabulary, bullets read as a list, code spans as chips. */
 .prose {
-  margin: 0;
-  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
   font-size: 13.5px;
-  white-space: pre-wrap;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.prose.folded {
+  max-height: 320px;
+  overflow: hidden;
+  /* The fold lands mid-line; a fade says so instead of a hard cut. */
+  mask-image: linear-gradient(to bottom, black 78%, transparent);
+}
+
+.prose p {
+  margin: 0;
+}
+
+.prose h1,
+.prose h2 {
+  margin: 4px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--charcoal);
+}
+
+.prose ul,
+.prose ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prose li::marker {
+  color: var(--grey);
+}
+
+.prose a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 2px;
+}
+
+.prose a:hover {
+  text-decoration-color: var(--charcoal);
+}
+
+.prose pre {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--hover);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12.5px;
   overflow-x: auto;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
 }
 
 /* Controls in one line: an input that takes the room and the buttons beside it. */
