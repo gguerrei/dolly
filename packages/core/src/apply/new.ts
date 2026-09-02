@@ -31,6 +31,14 @@ const INSTALL_NAME: Record<string, string> = {
   biome: "@biomejs/biome",
   "ruff-format": "ruff",
   tsc: "typescript",
+  phpunit: "phpunit/phpunit",
+  pest: "pestphp/pest",
+  phpstan: "phpstan/phpstan",
+  psalm: "vimeo/psalm",
+  "php-cs-fixer": "friendsofphp/php-cs-fixer",
+  pint: "laravel/pint",
+  mstest: "MSTest.TestFramework",
+  nunit: "NUnit",
 };
 
 export class TargetNotEmptyError extends Error {
@@ -140,7 +148,10 @@ export async function scaffoldProject(
   }
 
   // --- Base manifest + embed targets ---------------------------------------
-  const manifestPath = ecosystem ? MANIFEST_OF[ecosystem] : undefined;
+  const manifestPath = ecosystem ? manifestPathOf(ecosystem, pattern, projectName) : undefined;
+  if (ecosystem === "maven" && manifestPath === "build.gradle.kts") {
+    files.set("settings.gradle.kts", `rootProject.name = "${projectName}"\n`);
+  }
   for (const target of new Set([...(manifestPath ? [manifestPath] : []), ...embeds.keys()])) {
     if (files.has(target)) continue; // a verbatim capture of the whole file wins
     const base =
@@ -380,7 +391,77 @@ function baseManifest(
       dependencies: {},
     };
   }
-  return `module ${projectName}\n${versions.go ? `\ngo ${barePin(versions.go)}\n` : ""}`;
+  if (ecosystem === "go") {
+    return `module ${projectName}\n${versions.go ? `\ngo ${barePin(versions.go)}\n` : ""}`;
+  }
+  if (ecosystem === "rubygems") {
+    const ruby = versions.ruby ? `\nruby "${barePin(versions.ruby)}"\n` : "";
+    return `source "https://rubygems.org"\n${ruby}`;
+  }
+  if (ecosystem === "maven") {
+    const java = versions.java ? barePin(versions.java) : undefined;
+    if (pattern.toolchain?.packageManager === "gradle") {
+      const toolchain = java
+        ? `\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(${java})\n    }\n}\n`
+        : "";
+      return `plugins {\n    java\n}\n\ngroup = "${javaGroup(projectName)}"\nversion = "0.1.0"\n\nrepositories {\n    mavenCentral()\n}\n${toolchain}`;
+    }
+    const properties = [
+      ...(java ? [`    <maven.compiler.release>${java}</maven.compiler.release>`] : []),
+      "    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>",
+    ].join("\n");
+    const license = pattern.license
+      ? `  <licenses>\n    <license>\n      <name>${pattern.license}</name>\n    </license>\n  </licenses>\n`
+      : "";
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>${javaGroup(projectName)}</groupId>
+  <artifactId>${projectName}</artifactId>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
+  <properties>
+${properties}
+  </properties>
+${license}</project>
+`;
+  }
+  if (ecosystem === "composer") {
+    const php = versions.php;
+    return {
+      name: `${projectName}/${projectName}`,
+      description: "",
+      type: "project",
+      ...(pattern.license ? { license: pattern.license } : {}),
+      require: { ...(php ? { php: /^\d/.test(php) ? `>=${php}` : php } : {}) },
+      autoload: { "psr-4": { "App\\": "src/" } },
+    };
+  }
+  // nuget: the project file, named after the project; the SDK pin becomes the target framework.
+  const sdk = versions.dotnet ? barePin(versions.dotnet).match(/^(\d+)\.(\d+)/) : null;
+  const framework = sdk ? `    <TargetFramework>net${sdk[1]}.${sdk[2]}</TargetFramework>\n` : "";
+  return `<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+${framework}    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
+`;
+}
+
+/** Where the base manifest goes: the ecosystem's file, the Gradle build file when the pattern says Gradle, the project file named after the project on .NET. */
+function manifestPathOf(ecosystem: Ecosystem, pattern: Pattern, projectName: string): string {
+  if (ecosystem === "maven" && pattern.toolchain?.packageManager === "gradle")
+    return "build.gradle.kts";
+  return MANIFEST_OF[ecosystem].replaceAll("{name}", projectName);
+}
+
+/** A reverse-domain group for a project name: "my-service" reads as "dev.myservice". */
+function javaGroup(projectName: string): string {
+  return `dev.${projectName.replace(/[^a-z0-9]/g, "")}`;
 }
 
 /**
@@ -462,6 +543,26 @@ function testSeed(
       name: named("scaffold", "test_scaffold.py"),
       contents: "def test_scaffold() -> None:\n    assert True\n",
     };
+  if (runner === "rspec")
+    return {
+      name: named("scaffold", "scaffold_spec.rb"),
+      contents:
+        'RSpec.describe "scaffold" do\n  it "runs" do\n    expect(true).to be(true)\n  end\nend\n',
+    };
+  if (runner === "minitest")
+    return {
+      name: named("scaffold", "scaffold_test.rb"),
+      contents:
+        'require "minitest/autorun"\n\nclass ScaffoldTest < Minitest::Test\n  def test_scaffold\n    assert true\n  end\nend\n',
+    };
+  if (runner === "phpunit" || runner === "pest")
+    return {
+      name: named("Scaffold", "ScaffoldTest.php"),
+      contents:
+        runner === "pest"
+          ? "<?php\n\ntest('scaffold', function () {\n    expect(true)->toBeTrue();\n});\n"
+          : "<?php\n\nuse PHPUnit\\Framework\\TestCase;\n\nfinal class ScaffoldTest extends TestCase\n{\n    public function testScaffold(): void\n    {\n        $this->assertTrue(true);\n    }\n}\n",
+    };
   return undefined;
 }
 
@@ -516,6 +617,21 @@ function nextSteps(
     if (dev.length > 0) steps.push(`cargo add --dev ${dev.join(" ")}`);
   } else if (ecosystem === "go") {
     for (const dep of [...runtime, ...dev]) steps.push(`go get ${dep}`);
+  } else if (ecosystem === "rubygems") {
+    if (runtime.length > 0) steps.push(`bundle add ${runtime.join(" ")}`);
+    if (dev.length > 0) steps.push(`bundle add --group development,test ${dev.join(" ")}`);
+    if (runtime.length === 0 && dev.length === 0) steps.push("bundle install");
+  } else if (ecosystem === "maven") {
+    // Neither Maven nor Gradle adds a dependency from the command line.
+    const file = pattern.toolchain?.packageManager === "gradle" ? "build.gradle.kts" : "pom.xml";
+    if (runtime.length > 0) steps.push(`add to ${file}: ${runtime.join(", ")}`);
+    if (dev.length > 0) steps.push(`add to ${file} (test scope): ${dev.join(", ")}`);
+  } else if (ecosystem === "composer") {
+    if (runtime.length > 0) steps.push(`composer require ${runtime.join(" ")}`);
+    if (dev.length > 0) steps.push(`composer require --dev ${dev.join(" ")}`);
+    if (runtime.length === 0 && dev.length === 0) steps.push("composer install");
+  } else if (ecosystem === "nuget") {
+    for (const dep of [...runtime, ...dev]) steps.push(`dotnet add package ${dep}`);
   }
 
   steps.push('git add -A && git commit -m "scaffold"');

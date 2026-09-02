@@ -1,10 +1,10 @@
 import { join } from "node:path";
+import { isManifestName } from "../../extract/registry";
 import { isSafePatternPath } from "../../pattern/schema";
 import { getDeep, isSafeDottedPath } from "../../serialize";
 import type { FixPlan } from "../fix";
 import { invisibleFile, type Rule, type Violation } from "../rule";
 import { canRewrite, isSubsetOf, parseLoose } from "../support";
-import { MANIFEST_NAMES } from "./layout";
 
 export const configRule: Rule = {
   id: "config",
@@ -58,7 +58,7 @@ export const configRule: Rule = {
       if (!exists) {
         // The layout rule refuses to invent a root manifest, and so does this
         // one: a file holding only `[tool.ruff]` is not a pyproject.toml.
-        if (MANIFEST_NAMES.has(target)) {
+        if (isManifestName(target)) {
           violations.push({
             rule: "config",
             path: target,

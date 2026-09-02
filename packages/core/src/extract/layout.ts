@@ -56,6 +56,7 @@ const STOPLIST = new Set([
   "crates",
   "examples",
   "migrations",
+  "spec",
 ]);
 
 /** Root files that are structure in their own right. */
@@ -70,6 +71,10 @@ const ANCHOR_PATTERNS = [
   /^pyproject\.toml$/,
   /^cargo\.toml$/i,
   /^go\.mod$/,
+  /^gemfile$/i,
+  /^pom\.xml$/,
+  /^(build|settings)\.gradle(\.kts)?$/,
+  /^composer\.json$/,
   /^tsconfig.*\.json$/,
   /^makefile$/i,
   /^justfile$/i,
@@ -95,6 +100,7 @@ const ROOT_VOCAB = new Set([
   "pkg",
   "internal",
   "crates",
+  "spec",
 ]);
 
 /** Names that never vote in file-sibling groups. */

@@ -37,16 +37,16 @@ const DEV_GROUPS = new Set([
   "coverage",
 ]);
 
-/** Toolchain winners that are ecosystem builtins, not installable libraries. */
+/** Toolchain winners that are not installable libraries: runtime builtins and build plugins. */
 const BUILTIN_TOOLS = new Set([
   "rustfmt",
   "gofmt",
-  "cargo-test",
-  "go-test",
   "bun-test",
   "node-test",
-  "deno-fmt",
-  "deno-lint",
+  "dotnet-format",
+  "checkstyle",
+  "detekt",
+  "junit",
 ]);
 
 type Policy = "pinned" | "caret" | "latest";
@@ -77,6 +77,10 @@ export async function scanDependencies(
   await parsePypi(inventory, deps, notes);
   await parseCargo(inventory, deps, notes);
   await parseGo(inventory, deps);
+  await parseRubygems(inventory, deps);
+  await parseMaven(inventory, deps, notes);
+  await parseComposer(inventory, deps, notes);
+  await parseNuget(inventory, deps, notes);
 
   // Merge per (ecosystem, name): runtime wins over dev; one modal shape vote each.
   const merged = new Map<
@@ -238,6 +242,8 @@ function modalShape(shapes: Policy[]): Policy | undefined {
 function normalizeForLookup(ecosystem: Ecosystem, name: string): string {
   if (ecosystem === "pypi") return name.toLowerCase().replace(/[-_.]+/g, "-");
   if (ecosystem === "go") return name.replace(/\/v\d+$/, "");
+  // Composer and NuGet ids are case-insensitive; the registry keeps them lower.
+  if (ecosystem === "composer" || ecosystem === "nuget") return name.toLowerCase();
   return name;
 }
 
@@ -588,3 +594,211 @@ async function parseGo(inventory: Inventory, deps: Dep[]): Promise<void> {
 }
 
 // --- shared ------------------------------------------------------------
+
+// --- rubygems ----------------------------------------------------------
+
+/**
+ * A Gemfile is Ruby, read line by line: `gem "name", "~> 1.2"` with the
+ * groups a `group :development do` block opens. A gemspec's dependencies
+ * are code, and stay unread.
+ */
+async function parseRubygems(inventory: Inventory, deps: Dep[]): Promise<void> {
+  const text = await readIfExists(join(inventory.root, "Gemfile"));
+  if (text === undefined) return;
+  const DEV_GEM_GROUPS = new Set(["development", "test", "doc", "docs", "lint"]);
+  let depth = 0;
+  const groupDepths: { depth: number; dev: boolean }[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/#.*$/, "").trim();
+    if (line === "") continue;
+    const group = line.match(/^group\s+(.+?)\s+do$/);
+    if (group) {
+      const names = [...(group[1] as string).matchAll(/:(\w+)/g)].map((m) => m[1] as string);
+      depth++;
+      groupDepths.push({ depth, dev: names.every((name) => DEV_GEM_GROUPS.has(name)) });
+      continue;
+    }
+    if (/\bdo\b\s*$/.test(line)) {
+      depth++;
+      continue;
+    }
+    if (line === "end") {
+      if (groupDepths[groupDepths.length - 1]?.depth === depth) groupDepths.pop();
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    const gem = line.match(/^gem\s+["']([^"']+)["']\s*(.*)$/);
+    if (!gem) continue;
+    const name = gem[1] as string;
+    const rest = gem[2] as string;
+    const inline = rest.match(/group:\s*(?:\[([^\]]*)\]|:(\w+))/);
+    const inlineDev = inline
+      ? [...(inline[1] ?? `:${inline[2]}`).matchAll(/:(\w+)/g)].every((m) =>
+          DEV_GEM_GROUPS.has(m[1] as string),
+        )
+      : undefined;
+    const dev = inlineDev ?? groupDepths.some((g) => g.dev);
+    const specs = [...rest.matchAll(/^(?:,\s*)?["']([^"']+)["']|,\s*["']([^"']+)["']/g)]
+      .map((m) => (m[1] ?? m[2]) as string)
+      .filter((spec) => /^[~><=\d]/.test(spec));
+    const shape = /\b(?:git|github|path):/.test(rest) ? UNVOTABLE : gemShape(specs);
+    deps.push({ ecosystem: "rubygems", name, bucket: dev ? "dev" : "runtime", shape });
+  }
+}
+
+function gemShape(specs: string[]): Policy | typeof UNVOTABLE {
+  if (specs.length === 0) return "latest";
+  if (specs.some((s) => s.startsWith("~>"))) return "caret";
+  if (specs.some((s) => /^=?\s*\d/.test(s))) return "pinned";
+  if (specs.some((s) => s.startsWith(">")))
+    return specs.some((s) => s.startsWith("<")) ? "caret" : "latest";
+  return UNVOTABLE;
+}
+
+// --- maven (and gradle) ------------------------------------------------
+
+/**
+ * The JVM: a pom.xml's `<dependency>` blocks, or the `implementation("g:a:v")`
+ * lines of a Gradle build file, named `group:artifact`. A version that is a
+ * property or a project reference abstains from the policy vote.
+ */
+async function parseMaven(inventory: Inventory, deps: Dep[], notes: string[]): Promise<void> {
+  const pom = await readIfExists(join(inventory.root, "pom.xml"));
+  if (pom !== undefined) {
+    const blocks = pom.match(/<dependency>[\s\S]*?<\/dependency>/g) ?? [];
+    if (blocks.length === 0 && /<dependencies>/.test(pom)) {
+      notes.push("pom.xml declares dependencies dolly could not read; nothing extracted from it.");
+    }
+    for (const block of blocks) {
+      const field = (tag: string) =>
+        block.match(new RegExp(`<${tag}>\\s*([^<]+?)\\s*</${tag}>`))?.[1];
+      const group = field("groupId");
+      const artifact = field("artifactId");
+      if (!group || !artifact) continue;
+      const scope = field("scope") ?? "compile";
+      deps.push({
+        ecosystem: "maven",
+        name: `${group}:${artifact}`,
+        bucket: scope === "test" || scope === "provided" ? "dev" : "runtime",
+        shape: mavenShape(field("version")),
+      });
+    }
+    return;
+  }
+  for (const file of ["build.gradle.kts", "build.gradle"]) {
+    const text = await readIfExists(join(inventory.root, file));
+    if (text === undefined) continue;
+    const lines = text.matchAll(
+      /^\s*(implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\s*\(?\s*["']([^"':]+):([^"':]+)(?::([^"']+))?["']/gm,
+    );
+    for (const m of lines) {
+      const configuration = m[1] as string;
+      deps.push({
+        ecosystem: "maven",
+        name: `${m[2]}:${m[3]}`,
+        bucket: configuration.startsWith("test") ? "dev" : "runtime",
+        shape: gradleShape(m[4]),
+      });
+    }
+    return;
+  }
+}
+
+function mavenShape(version: string | undefined): Policy | typeof UNVOTABLE {
+  if (version === undefined) return UNVOTABLE; // managed by a parent or a BOM
+  if (/^\$\{/.test(version)) return UNVOTABLE;
+  if (/^(LATEST|RELEASE)$/.test(version)) return "latest";
+  if (/^[[(]/.test(version)) return "caret";
+  return "pinned";
+}
+
+function gradleShape(version: string | undefined): Policy | typeof UNVOTABLE {
+  if (version === undefined || version.startsWith("$")) return UNVOTABLE;
+  if (/^latest\./.test(version) || version === "+") return "latest";
+  if (/\+$/.test(version) || /^[[(]/.test(version)) return "caret";
+  return "pinned";
+}
+
+// --- composer ----------------------------------------------------------
+
+async function parseComposer(inventory: Inventory, deps: Dep[], notes: string[]): Promise<void> {
+  const path = join(inventory.root, "composer.json");
+  if (!(await Bun.file(path).exists())) return;
+  const manifest = await readJsonSafe(path);
+  if (!manifest) {
+    notes.push("composer.json could not be parsed; PHP dependencies not extracted.");
+    return;
+  }
+  for (const [section, bucket] of [
+    ["require", "runtime"],
+    ["require-dev", "dev"],
+  ] as const) {
+    for (const [name, spec] of Object.entries(
+      (manifest[section] as Record<string, string> | undefined) ?? {},
+    )) {
+      // "php" and "ext-*" are the platform, not libraries.
+      if (name === "php" || name.startsWith("ext-") || name.startsWith("lib-")) continue;
+      if (typeof spec !== "string") continue;
+      deps.push({ ecosystem: "composer", name, bucket, shape: composerShape(spec) });
+    }
+  }
+}
+
+function composerShape(spec: string): Policy | typeof UNVOTABLE {
+  const s = spec.trim();
+  if (s === "" || s === "*" || s.startsWith("dev-") || s.endsWith("@dev")) return "latest";
+  if (/^\d+(\.\d+)*$/.test(s)) return "pinned";
+  if (/^[\^~]/.test(s) || /\.\*$/.test(s) || s.includes(" - ")) return "caret";
+  if (/[<>]/.test(s)) return s.includes("<") ? "caret" : "latest";
+  return UNVOTABLE;
+}
+
+// --- nuget -------------------------------------------------------------
+
+/**
+ * Every project file in the tree (a solution spreads them over
+ * directories), each `<PackageReference Include="Id" Version="1.2.3" />`,
+ * plus the versions Directory.Packages.props keeps centrally.
+ */
+async function parseNuget(inventory: Inventory, deps: Dep[], notes: string[]): Promise<void> {
+  const projects = inventory.files.filter((f) => /\.(csproj|fsproj|vbproj)$/i.test(f.path));
+  if (projects.length === 0) return;
+  const central = new Map<string, string>();
+  const props = await readIfExists(join(inventory.root, "Directory.Packages.props"));
+  for (const m of (props ?? "").matchAll(
+    /<PackageVersion\s+Include="([^"]+)"\s+Version="([^"]+)"/g,
+  )) {
+    central.set((m[1] as string).toLowerCase(), m[2] as string);
+  }
+  const seen = new Set<string>();
+  for (const project of projects) {
+    const text = await readIfExists(join(inventory.root, project.path));
+    if (text === undefined) continue;
+    const testProject = /<IsTestProject>\s*true\s*<\/IsTestProject>/i.test(text);
+    for (const m of text.matchAll(/<PackageReference\s+([^>]*?)\/?>/g)) {
+      const attrs = m[1] as string;
+      const id = attrs.match(/Include="([^"]+)"/)?.[1];
+      if (!id) continue;
+      const key = `${project.path}\0${id.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const version = attrs.match(/Version="([^"]+)"/)?.[1] ?? central.get(id.toLowerCase());
+      deps.push({
+        ecosystem: "nuget",
+        name: id,
+        bucket: testProject ? "dev" : "runtime",
+        shape: nugetShape(version),
+      });
+    }
+    if (/<PackageReference/.test(text) && !/Include="/.test(text)) {
+      notes.push(`${project.path} declares package references dolly could not read.`);
+    }
+  }
+}
+
+function nugetShape(version: string | undefined): Policy | typeof UNVOTABLE {
+  if (version === undefined || version.startsWith("$")) return UNVOTABLE;
+  if (/\*/.test(version)) return "caret";
+  if (/^[[(]/.test(version)) return /^\[[^,]+\]$/.test(version) ? "pinned" : "caret";
+  return "pinned"; // a bare NuGet version is a floor, and restore takes the lowest match
+}

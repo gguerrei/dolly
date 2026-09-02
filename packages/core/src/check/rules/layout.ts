@@ -1,12 +1,9 @@
 import { basename } from "node:path";
 import { stubContents } from "../../apply/content";
-import { ecosystemOfPattern, MANIFEST_OF } from "../../extract/registry";
+import { ecosystemOfPattern, isManifestName } from "../../extract/registry";
 import { isSafePatternPath, slugify } from "../../pattern/schema";
 import { invisibleFile, type Rule, type Violation } from "../rule";
 import { existsOnDisk } from "../support";
-
-/** Root manifests are project decisions, not stubs; check never invents one. */
-export const MANIFEST_NAMES = new Set(Object.values(MANIFEST_OF));
 
 export const layoutRule: Rule = {
   id: "layout",
@@ -50,7 +47,8 @@ export const layoutRule: Rule = {
         violations.push(invisibleFile("layout", entry.path));
         continue;
       }
-      const manifest = !isDir && MANIFEST_NAMES.has(bare);
+      // Root manifests are project decisions, not stubs; check never invents one.
+      const manifest = !isDir && isManifestName(bare);
       violations.push({
         rule: "layout",
         path: entry.path,

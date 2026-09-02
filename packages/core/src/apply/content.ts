@@ -38,6 +38,10 @@ export function gitignoreFor(ecosystem: Ecosystem | undefined): string {
     pypi: ["__pycache__/", ".venv/", "dist/", ".pytest_cache/", ".ruff_cache/"],
     cargo: ["target/"],
     go: [],
+    rubygems: [".bundle/", "vendor/bundle/", "log/", "tmp/"],
+    maven: ["target/", "build/", ".gradle/"],
+    composer: ["vendor/"],
+    nuget: ["bin/", "obj/"],
   };
   return `${[...(ecosystem ? byEcosystem[ecosystem] : []), ".env"].join("\n")}\n`;
 }

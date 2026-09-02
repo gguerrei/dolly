@@ -36,6 +36,10 @@ const AMBIGUOUS_DEFAULTS: Record<string, string> = {
   ".rs": "Rust",
   ".ts": "TypeScript",
   ".sql": "SQL",
+  ".php": "PHP",
+  ".cs": "C#",
+  ".fs": "F#",
+  ".r": "R",
 };
 
 /** Binary assets are neither code nor "unrecognized code"; they are invisible. */
@@ -367,6 +371,36 @@ async function collectVersions(inventory: Inventory): Promise<Record<string, str
         | undefined
     )?.["rust-version"];
   if (typeof rustVersion === "string") versions.rust = rustVersion;
+
+  const rubyVersion = await readIfExists(join(root, ".ruby-version"));
+  if (rubyVersion?.trim()) versions.ruby = rubyVersion.trim().replace(/^ruby-/, "");
+  const gemfileRuby = (await readIfExists(join(root, "Gemfile")))?.match(
+    /^ruby\s+["']([^"']+)["']/m,
+  )?.[1];
+  if (gemfileRuby) versions.ruby = gemfileRuby;
+
+  const javaVersion = await readIfExists(join(root, ".java-version"));
+  if (javaVersion?.trim()) versions.java = javaVersion.trim();
+  const pom = await readIfExists(join(root, "pom.xml"));
+  const pomJava = pom?.match(
+    /<(?:maven\.compiler\.(?:release|source|target)|java\.version)>\s*([^<\s]+)\s*</,
+  )?.[1];
+  if (pomJava && !pomJava.startsWith("$")) versions.java = pomJava;
+  const gradle =
+    (await readIfExists(join(root, "build.gradle.kts"))) ??
+    (await readIfExists(join(root, "build.gradle")));
+  const gradleJava = gradle?.match(
+    /(?:jvmToolchain|JavaLanguageVersion\.of)\s*\(\s*(\d+)\s*\)/,
+  )?.[1];
+  if (gradleJava) versions.java = gradleJava;
+
+  const composer = await readJsonSafe(join(root, "composer.json"));
+  const php = (composer?.require as Record<string, string> | undefined)?.php;
+  if (typeof php === "string") versions.php = php;
+
+  const globalJson = await readJsonSafe(join(root, "global.json"));
+  const sdk = (globalJson?.sdk as Record<string, unknown> | undefined)?.version;
+  if (typeof sdk === "string") versions.dotnet = sdk;
 
   return versions;
 }

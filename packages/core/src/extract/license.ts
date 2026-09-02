@@ -138,6 +138,33 @@ async function declaredLicenses(inventory: Inventory, notes: string[]): Promise<
     }
   }
 
+  if (atRoot.has("composer.json")) {
+    try {
+      // Composer allows a list of ids for a dual license; one id is the common case.
+      const manifest = JSON.parse(await read("composer.json")) as { license?: string | string[] };
+      const license = manifest.license;
+      addDeclared(
+        "composer.json",
+        typeof license === "string"
+          ? license
+          : Array.isArray(license)
+            ? license.join(" OR ")
+            : undefined,
+      );
+    } catch {
+      // Ditto.
+    }
+  }
+
+  if (atRoot.has("pom.xml")) {
+    // Maven names a license in prose ("The Apache Software License, Version
+    // 2.0"); only a name that is an SPDX id counts, the rest degrades to a note.
+    const name = (await read("pom.xml")).match(
+      /<licenses>[\s\S]*?<name>\s*([^<]+?)\s*<\/name>/,
+    )?.[1];
+    addDeclared("pom.xml", name);
+  }
+
   return { ids: [...ids], declaredSomething };
 }
 

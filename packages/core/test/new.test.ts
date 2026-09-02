@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { scaffoldProject, TargetNotEmptyError } from "../src/apply/new";
+import { checkProject } from "../src/check/check";
 import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
 import { isSafePatternPath, patternSchema } from "../src/pattern/schema";
 import { cleanupTempRoots, freshStore, repo, seed, tempDir } from "./support";
@@ -145,6 +146,89 @@ describe("scaffoldProject", () => {
 
     const report = await scaffoldProject(store, "shepherd", `${target}-again`);
     expect(report.nextSteps.join("\n")).toContain("uv add");
+  });
+
+  test("extract → new round-trips a Rails project: Gemfile, ruby pin, rspec seed, its own check clean", async () => {
+    const source = await repo({
+      Gemfile: [
+        'source "https://rubygems.org"',
+        'ruby "3.3.0"',
+        'gem "rails", "~> 7.1"',
+        'gem "pg", "~> 1.5"',
+        "group :development, :test do",
+        '  gem "rspec-rails", "~> 6.1"',
+        '  gem "rubocop", "~> 1.60"',
+        "end",
+        "",
+      ].join("\n"),
+      ".rubocop.yml": "AllCops:\n  NewCops: enable\n",
+      ".rspec": "--require spec_helper\n",
+      LICENSE:
+        "MIT License\n\nCopyright (c) 2020 Someone\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n\nThe above copyright notice and this permission notice shall be included in all\n",
+      "app/models/user.rb": "class User\nend\n",
+      "app/models/order.rb": "class Order\nend\n",
+      "spec/spec_helper.rb": "RSpec.configure do |c|\nend\n",
+      "spec/models/user_spec.rb": "RSpec.describe User do\nend\n",
+      "spec/models/order_spec.rb": "RSpec.describe Order do\nend\n",
+    });
+    const store = await freshStore();
+    await saveExtractedPattern(store, await extractPattern(source, "rails-app"));
+    const target = join(await tempDir("dolly-new-target-"), "lamb");
+    const report = await scaffoldProject(store, "rails-app", target);
+    expect(await Bun.file(join(target, "Gemfile")).text()).toBe(
+      'source "https://rubygems.org"\n\nruby "3.3.0"\n',
+    );
+    expect(await Bun.file(join(target, ".rubocop.yml")).text()).toBe(
+      "AllCops:\n  NewCops: enable\n",
+    );
+    expect(await Bun.file(join(target, "spec", "scaffold_spec.rb")).text()).toContain(
+      "RSpec.describe",
+    );
+    expect(report.nextSteps).toEqual([
+      `cd ${target}`,
+      "bundle add pg rails",
+      "bundle add --group development,test rspec rubocop",
+      'git add -A && git commit -m "scaffold"',
+    ]);
+    expect((await checkProject(store, "rails-app", target)).violations).toEqual([]);
+  });
+
+  test("extract → new round-trips a Laravel project: composer.json with the php floor, phpunit seed, its own check clean", async () => {
+    const source = await repo({
+      "composer.json": `${JSON.stringify({
+        name: "acme/shop",
+        license: "MIT",
+        require: { php: ">=8.2", "laravel/framework": "^11.0" },
+        "require-dev": { "phpunit/phpunit": "^10.5", "phpstan/phpstan": "^1.10" },
+      })}\n`,
+      "phpstan.neon": "parameters:\n  level: 6\n",
+      "phpunit.xml.dist": "<phpunit/>\n",
+      "src/App.php": "<?php\nfinal class App {}\n",
+      "src/Shop.php": "<?php\nfinal class Shop {}\n",
+      "tests/AppTest.php": "<?php\nfinal class AppTest {}\n",
+      "tests/ShopTest.php": "<?php\nfinal class ShopTest {}\n",
+    });
+    const store = await freshStore();
+    await saveExtractedPattern(store, await extractPattern(source, "shop"));
+    const target = join(await tempDir("dolly-new-target-"), "lamb");
+    const report = await scaffoldProject(store, "shop", target);
+    expect(await readJson(join(target, "composer.json"))).toEqual({
+      name: "lamb/lamb",
+      description: "",
+      type: "project",
+      license: "MIT",
+      require: { php: ">=8.2" },
+      autoload: { "psr-4": { "App\\": "src/" } },
+    });
+    expect(await Bun.file(join(target, "phpunit.xml.dist")).text()).toBe("<phpunit/>\n");
+    expect(await Bun.file(join(target, "tests", "ScaffoldTest.php")).text()).toContain("TestCase");
+    expect(report.nextSteps).toEqual([
+      `cd ${target}`,
+      "composer require laravel/framework",
+      "composer require --dev phpstan/phpstan phpunit/phpunit",
+      'git add -A && git commit -m "scaffold"',
+    ]);
+    expect((await checkProject(store, "shop", target)).violations).toEqual([]);
   });
 
   test("refuses a non-empty target directory", async () => {

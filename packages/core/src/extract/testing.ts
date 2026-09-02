@@ -32,6 +32,19 @@ const NAME_SHAPES: { pattern: RegExp; generalize: (basename: string) => string }
     pattern: /^(.+)_test\.([a-z0-9]+)$/,
     generalize: (b) => b.replace(/^.+_test\./, "{stem}_test."),
   },
+  {
+    pattern: /^(.+)_spec\.([a-z0-9]+)$/,
+    generalize: (b) => b.replace(/^.+_spec\./, "{stem}_spec."),
+  },
+  // PSR and JUnit (AppTest.php, AppTest.java) and xUnit (CartTests.cs) shapes.
+  {
+    pattern: /^(.+)Tests\.([a-z0-9]+)$/,
+    generalize: (b) => b.replace(/^.+Tests\./, "{stem}Tests."),
+  },
+  {
+    pattern: /^(.+)Test\.([a-z0-9]+)$/,
+    generalize: (b) => b.replace(/^.+Test\./, "{stem}Test."),
+  },
 ];
 
 /** True when the basename reads as a test file in any supported convention. */

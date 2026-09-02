@@ -51,6 +51,17 @@ const MANDATED_EXACT = new Set([
   "go.work",
   "deno.json",
   "deno.jsonc",
+  "gemfile",
+  "rakefile",
+  "guardfile",
+  "procfile",
+  "pom.xml",
+  "build.gradle",
+  "build.gradle.kts",
+  "settings.gradle",
+  "settings.gradle.kts",
+  "composer.json",
+  "global.json",
 ]);
 const MANDATED_STEMS = new Set(["index", "main", "__init__"]);
 
