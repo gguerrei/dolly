@@ -56,7 +56,7 @@ that does not validate).
 | `PUT /api/patterns/:name` | `parsePatternDocument` + verbatim write | `dolly edit` over HTTP: body is raw source, validated first; valid source is written byte-for-byte (the author's formatting is theirs), invalid is 422 with the parse error and nothing written |
 | `DELETE /api/patterns/:name` | `PatternStore.delete` | |
 | `POST /api/check` | `checkProject` (+ `readPatternMarker`) | `{ dir, pattern?, fix? }`; pattern falls back to the project's `.dolly` marker, same resolution order as the CLI |
-| `POST /api/fit` | `assistedFit` / `assistedFitApply` (+ `gitStateOf`) | `{ dir, pattern?, apply? }`; the `FitPlan` is data end to end, so it crosses the wire as itself, plus `git` so the UI can gate Apply; with AI on, declined items may carry a `suggestion` and steps may be `translate`; apply's git preconditions come back as 409 |
+| `POST /api/fit` | `assistedFit` / `assistedFitApply` (+ `gitStateOf`) | `{ dir, pattern?, apply? }`; the `FitPlan` is data end to end, so it crosses the wire as itself (each fix step with its `preview`, the patch as a unified diff), plus `git` so the UI can gate Apply; with AI on, declined items may carry a `suggestion` and steps may be `translate`; apply's git preconditions come back as 409 |
 | `GET /api/ai/providers` | `aiProviders` | every provider with its label, default model, and where its key lives |
 | `POST /api/ai/connect` | `connectAi` | `{ provider, key }`: verified live, then stored in the OS keychain; the provider's refusal is a 400 in its words |
 | `POST /api/ai/use` | `useAi` | `{ provider, model? }` |

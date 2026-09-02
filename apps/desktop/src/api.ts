@@ -82,7 +82,7 @@ export interface FitRewrite {
 }
 
 export type FitStep =
-  | { kind: "fix"; path: string; reason: string; plan: FitFixPlan }
+  | { kind: "fix"; path: string; reason: string; plan: FitFixPlan; preview: string }
   | { kind: "move"; rule: string; from: string; to: string; reason: string; rewrites: FitRewrite[] }
   | {
       kind: "translate";

@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { FitGitError, fitApply, fitProject, type MoveStep } from "../src/apply/fit";
+import { FitGitError, type FitStep, fitApply, fitProject, type MoveStep } from "../src/apply/fit";
 import { rewriteSpecifiers } from "../src/apply/imports";
 import { checkProject } from "../src/check/check";
 import { renderStem } from "../src/extract/naming";
@@ -279,6 +279,35 @@ describe("fitProject", () => {
     expect((moves(plan)[0] as MoveStep).to).toBe("packages/api/tests/user.test.ts");
   });
 
+  test("every fix step carries the patch it would make, as the file stands", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "tidy",
+      languages: { programming: ["TypeScript"] },
+      commands: { test: "bun test" },
+      layout: [{ path: "docs/", required: true }],
+    });
+    const root = await repo({
+      "package.json": '{\n  "name": "x",\n  "scripts": {\n    "lint": "biome check ."\n  }\n}\n',
+      ".env": "SECRET=1\n",
+      ".dolly": "pattern: tidy\n",
+    });
+    const plan = await fitProject(store, "tidy", root);
+    const fixes = plan.steps.filter(
+      (s): s is Extract<FitStep, { kind: "fix" }> => s.kind === "fix",
+    );
+    const byPath = Object.fromEntries(fixes.map((step) => [step.path, step.preview]));
+    // A merge shows the one key it adds, inside the author's own shape.
+    expect(byPath["package.json"]).toContain('+     "test": "bun test"');
+    expect(byPath["package.json"]).toContain('  "scripts": {');
+    // An append shows the line it adds; a directory create has nothing to show.
+    expect(byPath[".env"]).toBe("+ .env");
+    expect(byPath["docs/"]).toBe("");
+    // The preview reads the file as it stands: after apply, the same plan is empty.
+    await checkProject(store, "tidy", root, { fix: true });
+    expect((await fitProject(store, "tidy", root)).steps).toEqual([]);
+  });
+
   test("a project without a marker gets one as a create step; a marker there is left alone", async () => {
     const store = await freshStore();
     await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
@@ -290,6 +319,7 @@ describe("fitProject", () => {
         path: ".dolly",
         reason: "links the project to its pattern, so check and fit resolve it without a name",
         plan: { kind: "create", path: ".dolly", contents: "pattern: kebab\n" },
+        preview: "+ pattern: kebab",
       },
     ]);
     await writeFile(join(root, ".dolly"), "pattern: other\n");

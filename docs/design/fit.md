@@ -25,8 +25,12 @@ and the pick rides along as a labeled suggestion; apply never reads it.
 1. **Dry-run is the mode; --apply is the exception.** A bare `dolly fit`
    never writes: it prints the full plan as a diff-shaped preview of every
    file created, merged, moved, renamed, and every import line the moves
-   will touch. `--apply` executes exactly that plan, nothing discovered
-   along the way.
+   will touch. Since 2026-09-01 that is literal: every fix step carries
+   the unified diff of the file as it stands (`FixStep.preview`, computed
+   by the same functions apply then writes with), the CLI prints it under
+   the step's line the way a move shows its rewrites, cut short past a
+   dozen lines, and the daemon serves it for the fit view. `--apply`
+   executes exactly that plan, nothing discovered along the way.
 2. **Git is the safety net, and it is mandatory.** Fit refuses a dirty
    working tree outright, and `--apply` first creates a checkpoint branch
    (`dolly/fit-<pattern>-<n>`) at HEAD: "fully revertible" means

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { applyEdits, modify } from "jsonc-parser";
+import { unifiedDiff } from "../learn/diff";
 import { BANNED_KEYS, getDeep, isPlainObject, serializeByExtension, setDeep } from "../serialize";
 import { deepEqual, parseLoose } from "./support";
 
@@ -66,55 +67,97 @@ export async function applyFix(root: string, plan: FixPlan): Promise<FixOutcome>
     case "append": {
       const file = Bun.file(target);
       const current = (await file.exists()) ? await file.text() : "";
-      if (
-        plan.skipIfLine !== undefined &&
-        current.split("\n").some((line) => line.trim() === plan.skipIfLine)
-      ) {
-        return "skipped";
-      }
-      const sep = current === "" || current.endsWith("\n") ? "" : "\n";
+      const next = appendedText(current, plan);
+      if (next === current) return "skipped";
       await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, `${current}${sep}${plan.text}`);
+      await writeFile(target, next);
       return "applied";
     }
     case "merge": {
       const file = Bun.file(target);
       const currentText = (await file.exists()) ? await file.text() : undefined;
-      // An existing JSON/JSONC file merges as minimal text edits: captured
-      // keys land, everything else (comments, tabs, key order, the author's
-      // whole shape) stands untouched.
-      if (currentText !== undefined && !/\.toml$/i.test(plan.path)) {
-        const parsed = parseLoose(plan.path, currentText);
-        if (isPlainObject(parsed)) {
-          const base = plan.at === undefined ? [] : plan.at.split(".");
-          const start = plan.at === undefined ? parsed : getDeep(parsed, plan.at);
-          let text = currentText;
-          for (const edit of minimalEdits(start, plan.value, base)) {
-            text = applyEdits(
-              text,
-              modify(text, edit.path, edit.value, { formattingOptions: formattingOf(text) }),
-            );
-          }
-          await mkdir(dirname(target), { recursive: true });
-          await writeFile(target, text);
-          return "applied";
-        }
-      }
-      // TOML, a missing file, or an unparseable one: the whole-document path.
-      const parsed = currentText === undefined ? {} : (parseLoose(plan.path, currentText) ?? {});
-      const node = isPlainObject(parsed) ? parsed : {};
-      if (plan.at === undefined) {
-        const merged = mergeCaptured(plan.value, node) as Record<string, unknown>;
-        await mkdir(dirname(target), { recursive: true });
-        await writeFile(target, serializeByExtension(plan.path, merged));
-      } else {
-        setDeep(node, plan.at, mergeCaptured(plan.value, getDeep(node, plan.at)));
-        await mkdir(dirname(target), { recursive: true });
-        await writeFile(target, serializeByExtension(plan.path, node));
-      }
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, mergedText(currentText, plan));
       return "applied";
     }
   }
+}
+
+/**
+ * The file as a plan would leave it, without touching the disk: what fit
+ * shows before apply, and what apply then writes. A create over a file
+ * that exists, or an append whose guard holds, leaves the text as it is.
+ */
+export async function plannedText(root: string, plan: FixPlan): Promise<string> {
+  const file = Bun.file(join(root, plan.path));
+  const exists = await file.exists();
+  const current = exists ? await file.text() : "";
+  switch (plan.kind) {
+    case "create":
+      return exists ? current : plan.contents;
+    case "write":
+      return plan.contents;
+    case "append":
+      return appendedText(current, plan);
+    case "merge":
+      return mergedText(exists ? current : undefined, plan);
+  }
+}
+
+/** The patch a plan would make, as a unified diff; empty when it would change nothing. */
+export async function previewFix(root: string, plan: FixPlan): Promise<string> {
+  const file = Bun.file(join(root, plan.path));
+  const current = (await file.exists()) ? await file.text() : "";
+  const next = await plannedText(root, plan);
+  // A file that ends in a newline splits into a trailing empty line, which
+  // the diff would print as one blank context line at the end; drop it.
+  return next === current ? "" : unifiedDiff(current, next).replace(/\n {2}$/, "");
+}
+
+function appendedText(current: string, plan: Extract<FixPlan, { kind: "append" }>): string {
+  if (
+    plan.skipIfLine !== undefined &&
+    current.split("\n").some((line) => line.trim() === plan.skipIfLine)
+  ) {
+    return current;
+  }
+  const sep = current === "" || current.endsWith("\n") ? "" : "\n";
+  return `${current}${sep}${plan.text}`;
+}
+
+function mergedText(
+  currentText: string | undefined,
+  plan: Extract<FixPlan, { kind: "merge" }>,
+): string {
+  // An existing JSON/JSONC file merges as minimal text edits: captured
+  // keys land, everything else (comments, tabs, key order, the author's
+  // whole shape) stands untouched.
+  if (currentText !== undefined && !/\.toml$/i.test(plan.path)) {
+    const parsed = parseLoose(plan.path, currentText);
+    if (isPlainObject(parsed)) {
+      const base = plan.at === undefined ? [] : plan.at.split(".");
+      const start = plan.at === undefined ? parsed : getDeep(parsed, plan.at);
+      let text = currentText;
+      for (const edit of minimalEdits(start, plan.value, base)) {
+        text = applyEdits(
+          text,
+          modify(text, edit.path, edit.value, { formattingOptions: formattingOf(text) }),
+        );
+      }
+      return text;
+    }
+  }
+  // TOML, a missing file, or an unparseable one: the whole-document path.
+  const parsed = currentText === undefined ? {} : (parseLoose(plan.path, currentText) ?? {});
+  const node = isPlainObject(parsed) ? parsed : {};
+  if (plan.at === undefined) {
+    return serializeByExtension(
+      plan.path,
+      mergeCaptured(plan.value, node) as Record<string, unknown>,
+    );
+  }
+  setDeep(node, plan.at, mergeCaptured(plan.value, getDeep(node, plan.at)));
+  return serializeByExtension(plan.path, node);
 }
 
 /**

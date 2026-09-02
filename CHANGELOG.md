@@ -211,6 +211,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and every carrier agrees, a JSON or TOML config keeps the keys every
   copy shares, and whatever was left out is named in the notes with each
   project's own notes after them. The daemon takes `dirs` for the same.
+- Every fix step in a fit plan carries the patch it would make, a unified
+  diff of the file as it stands, computed by the same functions apply
+  writes with; the dry run prints it under the step's line, cut short
+  past a dozen lines, and the daemon serves it with the plan.
+- `dolly completions zsh|bash|fish` prints a completion script rendered
+  from the command tree, so it cannot drift from it; pattern names
+  complete live from `dolly list`, and directory arguments as
+  directories. The script's header says where to install it.
 
 ### Changed
 

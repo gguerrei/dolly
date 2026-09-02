@@ -45,6 +45,7 @@ import {
 } from "@dollysheep/core";
 import { Command } from "commander";
 import pkg from "../package.json";
+import { renderCompletions, SHELLS, type Shell } from "./completions";
 import { DEFAULT_PORT, serveDolly } from "./serve";
 import { checkView } from "./views";
 
@@ -460,11 +461,25 @@ ai.command("off")
   });
 
 program
+  .command("completions")
+  .argument("<shell>", `the shell to complete for: ${SHELLS.join(", ")}`)
+  .description("Print a completion script for your shell; the header says where to put it.")
+  .action((shell: string) => {
+    if (!SHELLS.includes(shell as Shell)) {
+      throw new Error(`Unknown shell "${shell}"; one of: ${SHELLS.join(", ")}.`);
+    }
+    process.stdout.write(renderCompletions(program, shell as Shell));
+  });
+
+program
   .command("home")
   .description("Print where dolly stores its data on this machine.")
   .action(() => {
     console.log(dollyHome());
   });
+
+/** How much of a fix's patch the dry run prints before cutting it short. */
+const PREVIEW_LINES = 12;
 
 function printFitPlan(name: string, plan: FitPlan): void {
   if (plan.diagnostics.length > 0) {
@@ -479,6 +494,15 @@ function printFitPlan(name: string, plan: FitPlan): void {
   for (const step of plan.steps) {
     if (step.kind === "fix") {
       console.log(`${step.plan.kind.padEnd(7)} ${step.path}: ${step.reason}`);
+      // The patch itself, the way a move shows its rewrites; a long create is cut short.
+      const lines = step.preview.split("\n").filter((line) => line !== "");
+      const shown = lines.slice(0, PREVIEW_LINES);
+      for (const line of shown) console.log(`        ${line}`);
+      if (lines.length > shown.length) {
+        console.log(
+          `        … ${lines.length - shown.length} more line${lines.length - shown.length === 1 ? "" : "s"}`,
+        );
+      }
     } else if (step.kind === "move") {
       console.log(`move    ${step.from} → ${step.to}: ${step.reason}`);
       for (const rewrite of step.rewrites) {

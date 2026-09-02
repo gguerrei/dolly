@@ -88,6 +88,7 @@ dolly export <pattern> [--as t] [--out f] # a .dolly bundle, or a skill/rule/AGE
 dolly import <file-or-url> [--force] # import a shared pattern         (M1, done; URLs 2026-09-01)
 dolly link <pattern> [-C dir]     # write the .dolly marker into an existing project (2026-09-01, done)
 dolly ai [status|connect|use|off] # BYOK provider setup                 (M7, done)
+dolly completions <zsh|bash|fish> # a completion script for the shell  (2026-09-01, done)
 dolly learn [pattern] [--once] [--yes] # watch a project, review drafted pattern edits (M7, done)
 ```
 
