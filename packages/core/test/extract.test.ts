@@ -1045,14 +1045,18 @@ describe("extract end to end", () => {
         "docs/guide.md": "# guide\n",
       }),
     );
-    const c = await repo({
-      ...service("gamma", {
-        "biome.json": JSON.stringify({
-          formatter: { enabled: true, indentWidth: 2 },
-          linter: { enabled: true },
-        }),
+    // gamma names every file in snake_case, so naming cannot agree.
+    const gamma = service("gamma", {
+      "biome.json": JSON.stringify({
+        formatter: { enabled: true, indentWidth: 2 },
+        linter: { enabled: true },
       }),
-      // gamma names its files in snake_case, so naming cannot agree.
+    });
+    for (const path of Object.keys(gamma)) {
+      if (/-/.test(path.split("/").pop() as string)) delete gamma[path];
+    }
+    const c = await repo({
+      ...gamma,
       "src/user_service.ts": "export {};\n",
       "src/order_service.ts": "export {};\n",
       "src/api_client.ts": "export {};\n",
@@ -1079,9 +1083,12 @@ describe("extract end to end", () => {
     expect(document.prose).toContain(
       "biome.json differs between the repositories; only the keys they all agree on were captured.",
     );
-    // Naming disagrees (kebab, kebab, mixed): left out, and said.
+    // Naming disagrees (kebab, kebab, snake): left out, and said.
     expect(pattern.naming?.files).toBeUndefined();
-    expect(document.prose).toContain("naming.files is set in 2 of 3 repositories");
+    // The repositories are named by their directories, which the fixture does not control.
+    expect(document.prose).toMatch(
+      /naming\.files disagrees: \S+ says "kebab-case", \S+ says "kebab-case", \S+ says "snake_case"; left out\./,
+    );
     // Layout keeps the majority; docs/ from one repository is named as left out.
     expect(pattern.layout.map((e) => e.path)).toContain("src/");
     expect(pattern.layout.map((e) => e.path)).not.toContain("docs/");
