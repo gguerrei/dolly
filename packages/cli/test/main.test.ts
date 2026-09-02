@@ -156,6 +156,31 @@ describe("dolly CLI", () => {
     expect(shown.stdout).toContain("validation: zod");
   });
 
+  test("extract from several projects needs a name, and keeps what they agree on", async () => {
+    const make = async (name: string, license: string) => {
+      const dir = join(home, name);
+      await mkdir(join(dir, "src"), { recursive: true });
+      await writeFile(
+        join(dir, "package.json"),
+        JSON.stringify({ name, license, scripts: { test: "bun test" } }),
+      );
+      await writeFile(join(dir, "src", "index.ts"), "export {};\n");
+      return dir;
+    };
+    const one = await make("one", "MIT");
+    const two = await make("two", "Apache-2.0");
+    const unnamed = await dolly("extract", one, two);
+    expect(unnamed.exitCode).toBe(1);
+    expect(unnamed.stderr).toContain("Name the pattern with --name");
+    const named = await dolly("extract", one, two, "--name", "pair");
+    expect(named.exitCode).toBe(0);
+    expect(named.stdout).toContain('Saved pattern "pair" from 2 projects');
+    const shown = await dolly("show", "pair");
+    expect(shown.stdout).toContain("test: bun test");
+    expect(shown.stdout).not.toContain("license:");
+    expect(shown.stdout).toContain("license disagrees");
+  });
+
   test("new scaffolds a project from a saved pattern", async () => {
     await seedPattern(
       "tidy",

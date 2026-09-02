@@ -57,7 +57,12 @@ export {
   renderExport,
   type TextTarget,
 } from "./export/export";
-export { type ExtractResult, extractPattern, saveExtractedPattern } from "./extract/extract";
+export {
+  type ExtractResult,
+  extractFromRepos,
+  extractPattern,
+  saveExtractedPattern,
+} from "./extract/extract";
 export {
   draftDocument,
   type LearningWatch,

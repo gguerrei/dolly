@@ -451,6 +451,25 @@ describe("dolly serve", () => {
     expect(missing.status).toBe(404);
   });
 
+  test("extract from several dirs over the wire needs a name, then keeps the agreement", async () => {
+    const make = async (name: string) => {
+      const dir = join(home, name);
+      await mkdir(join(dir, "src"), { recursive: true });
+      await writeFile(join(dir, "package.json"), JSON.stringify({ name, license: "MIT" }));
+      await writeFile(join(dir, "src", "index.ts"), "export {};\n");
+      return dir;
+    };
+    const dirs = [await make("one"), await make("two")];
+    const unnamed = await api("/api/extract", { method: "POST", body: JSON.stringify({ dirs }) });
+    expect(unnamed.status).toBe(400);
+    const named = await api("/api/extract", {
+      method: "POST",
+      body: JSON.stringify({ dirs, name: "pair" }),
+    });
+    expect(named.status).toBe(200);
+    expect(((await named.json()) as { facets: string[] }).facets).toContain("license");
+  });
+
   test("check without a pattern or marker explains itself", async () => {
     const bare = join(home, "unmarked");
     await mkdir(bare, { recursive: true });

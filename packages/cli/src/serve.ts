@@ -17,6 +17,7 @@ import {
   EXPORT_TARGETS,
   ExportExistsError,
   exportPattern,
+  extractFromRepos,
   extractPattern,
   FitGitError,
   facetNames,
@@ -331,9 +332,23 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
   // The three flows the native shell's pickers unlocked (M9). Each binds the
   // verb the CLI binds and answers with what the CLI prints.
   if (path === "/api/extract" && request.method === "POST") {
-    const body = (await request.json()) as { dir?: string; name?: string; force?: boolean };
-    if (!body.dir) return json({ error: "`dir` is required: the project to learn from." }, 400);
-    const result = await extractPattern(body.dir, body.name || undefined);
+    // One `dir`, or several `dirs` to keep what they agree on (a name is required then).
+    const body = (await request.json()) as {
+      dir?: string;
+      dirs?: string[];
+      name?: string;
+      force?: boolean;
+    };
+    const dirs = body.dirs ?? (body.dir ? [body.dir] : []);
+    if (dirs.length === 0)
+      return json({ error: "`dir` is required: the project to learn from." }, 400);
+    if (dirs.length > 1 && !body.name) {
+      return json({ error: "`name` is required when extracting from several projects." }, 400);
+    }
+    const result =
+      dirs.length > 1
+        ? await extractFromRepos(dirs, body.name as string)
+        : await extractPattern(dirs[0] as string, body.name || undefined);
     const { pattern } = result.document;
     if ((await store.has(pattern.name)) && !body.force) throw new PatternExistsError(pattern.name);
     await saveExtractedPattern(store, result);
