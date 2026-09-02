@@ -13,7 +13,7 @@ export interface PatternSummary {
   error?: string;
 }
 
-/** The facet frontmatter, loosely mirrored from @dolly/core's schema. */
+/** The facet frontmatter, loosely mirrored from @dollysheep/core's schema. */
 export interface Pattern {
   name: string;
   description?: string;
@@ -69,7 +69,7 @@ export interface CheckReport {
   diagnostics: string[];
 }
 
-/** A fix as data, mirrored from @dolly/core's FixPlan. */
+/** A fix as data, mirrored from @dollysheep/core's FixPlan. */
 export interface FitFixPlan {
   kind: "create" | "write" | "append" | "merge";
   path: string;
@@ -113,7 +113,7 @@ export interface FitReport {
   failures?: string[];
 }
 
-/** A pattern edit learn proposes, mirrored from @dolly/core's Proposal, plus the diff the daemon renders for it. */
+/** A pattern edit learn proposes, mirrored from @dollysheep/core's Proposal, plus the diff the daemon renders for it. */
 export interface Proposal {
   /** Facet path as segments; ["layout"] appends an entry, ["prose"] a convention line. */
   path: string[];

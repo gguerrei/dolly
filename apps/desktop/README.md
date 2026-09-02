@@ -1,4 +1,4 @@
-# @dolly/desktop
+# @dollysheep/desktop
 
 dolly's GUI: a Vue 3 webview served by the local daemon. The design (the
 daemon protocol, the views, and why this app never links the engine

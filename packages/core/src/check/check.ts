@@ -1,5 +1,7 @@
 import { watch } from "node:fs";
 import { resolve } from "node:path";
+import { matchesGlob } from "../extract/globs";
+import { readMarker } from "../marker";
 import type { Pattern } from "../pattern/schema";
 import type { PatternStore } from "../store";
 import { collectInventory, comparePaths, DENY_DIRS } from "../tree/inventory";
@@ -56,6 +58,8 @@ export interface CheckReport {
   fixed: string[];
   /** Defects of the pattern (or failed fixes), not of the project. */
   diagnostics: string[];
+  /** Violations the project's `.dolly` ignore list set aside. */
+  ignored: number;
 }
 
 export async function checkProject(
@@ -67,9 +71,12 @@ export async function checkProject(
   const { pattern } = await store.load(patternName);
   const root = resolve(projectDir);
   const patternDir = store.dirOf(patternName);
+  const marker = await ignoreList(root);
 
-  const first = await runRules(root, pattern, patternName, patternDir);
-  if (!options.fix) return { ...first, fixed: [] };
+  const first = await runRules(root, pattern, patternName, patternDir, marker.ignore);
+  if (!options.fix) {
+    return { ...first, fixed: [], diagnostics: [...marker.diagnostics, ...first.diagnostics] };
+  }
 
   const fixed: string[] = [];
   const fixFailures: string[] = [];
@@ -91,8 +98,34 @@ export async function checkProject(
   }
   // Re-run so the report reflects the fixed tree: a fix that did not stick
   // resurfaces here instead of being reported as resolved.
-  const second = await runRules(root, pattern, patternName, patternDir);
-  return { ...second, fixed, diagnostics: [...second.diagnostics, ...fixFailures] };
+  const second = await runRules(root, pattern, patternName, patternDir, marker.ignore);
+  return {
+    ...second,
+    fixed,
+    diagnostics: [...marker.diagnostics, ...second.diagnostics, ...fixFailures],
+  };
+}
+
+/** The marker's ignore list; a marker that does not parse applies nothing and says so. */
+async function ignoreList(root: string): Promise<{ ignore: string[]; diagnostics: string[] }> {
+  try {
+    return { ignore: (await readMarker(root))?.ignore ?? [], diagnostics: [] };
+  } catch (error) {
+    return { ignore: [], diagnostics: [error instanceof Error ? error.message : String(error)] };
+  }
+}
+
+/** True when the path, or a directory above it, matches an ignore entry. */
+export function isIgnored(path: string, ignore: string[]): boolean {
+  const bare = path.replace(/\/$/, "");
+  const candidates = [bare];
+  for (let slash = bare.lastIndexOf("/"); slash !== -1; slash = bare.lastIndexOf("/", slash - 1)) {
+    candidates.push(bare.slice(0, slash));
+  }
+  return ignore.some((entry) => {
+    const glob = entry.replace(/\/$/, "");
+    return candidates.some((candidate) => matchesGlob(glob, candidate));
+  });
 }
 
 /**
@@ -129,7 +162,8 @@ async function runRules(
   pattern: Pattern,
   patternName: string,
   patternDir: string,
-): Promise<{ violations: Violation[]; diagnostics: string[] }> {
+  ignore: string[],
+): Promise<{ violations: Violation[]; diagnostics: string[]; ignored: number }> {
   const inventory = await collectInventory(root);
   const diagnostics: string[] = [];
   const context = {
@@ -140,9 +174,11 @@ async function runRules(
     inventory,
     diagnose: (message: string) => diagnostics.push(message),
   };
-  const violations: Violation[] = [];
-  for (const rule of RULES) violations.push(...(await rule.check(context)));
+  const found: Violation[] = [];
+  for (const rule of RULES) found.push(...(await rule.check(context)));
+  // The project's own word: an ignored violation is neither reported nor fixed.
+  const violations = found.filter((violation) => !isIgnored(violation.path, ignore));
   const order = (id: RuleId) => RULES.findIndex((rule) => rule.id === id);
   violations.sort((a, b) => order(a.rule) - order(b.rule) || comparePaths(a.path, b.path));
-  return { violations, diagnostics };
+  return { violations, diagnostics, ignored: found.length - violations.length };
 }

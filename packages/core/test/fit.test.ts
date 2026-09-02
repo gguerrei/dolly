@@ -279,6 +279,23 @@ describe("fitProject", () => {
     expect((moves(plan)[0] as MoveStep).to).toBe("packages/api/tests/user.test.ts");
   });
 
+  test("a project without a marker gets one as a create step; a marker there is left alone", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
+    const root = await repo({ "src/my-helper.ts": "export {};\n" });
+    const plan = await fitProject(store, "kebab", root);
+    expect(plan.steps).toEqual([
+      {
+        kind: "fix",
+        path: ".dolly",
+        reason: "links the project to its pattern, so check and fit resolve it without a name",
+        plan: { kind: "create", path: ".dolly", contents: "pattern: kebab\n" },
+      },
+    ]);
+    await writeFile(join(root, ".dolly"), "pattern: other\n");
+    expect((await fitProject(store, "kebab", root)).steps).toEqual([]);
+  });
+
   test("check's fixable violations ride along as fix steps", async () => {
     const store = await freshStore();
     await seed(store, { name: "lic", license: "MIT" });

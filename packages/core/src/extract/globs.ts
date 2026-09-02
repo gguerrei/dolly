@@ -7,12 +7,14 @@ export function expandGlobs(globs: string[], dirs: string[]): string[] {
   const excludes = globs.filter((g) => g.startsWith("!")).map((g) => g.slice(1));
   return dirs
     .filter(
-      (dir) => includes.some((g) => matches(g, dir)) && !excludes.some((g) => matches(g, dir)),
+      (dir) =>
+        includes.some((g) => matchesGlob(g, dir)) && !excludes.some((g) => matchesGlob(g, dir)),
     )
     .sort();
 }
 
-function matches(glob: string, dir: string): boolean {
+/** Whether one segment glob (`*`, `**`) matches a path; the marker's ignore list uses it too. */
+export function matchesGlob(glob: string, dir: string): boolean {
   const gs = glob.replace(/\/$/, "").split("/");
   const ds = dir.split("/");
   const match = (gi: number, di: number): boolean => {

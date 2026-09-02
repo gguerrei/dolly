@@ -546,6 +546,48 @@ describe("checkProject", () => {
     ]);
   });
 
+  test("the marker's ignore list sets violations aside: counted, never reported, never fixed", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "strict",
+      naming: { files: "snake_case" },
+      layout: [
+        { path: "docs/", required: true },
+        { path: "CHANGELOG.md", required: true },
+      ],
+    });
+    const project = await repo({
+      ".dolly": "pattern: strict\nignore:\n  - shell/*.fish\n  - legacy/\n  - CHANGELOG.md\n",
+      "shell/key-bindings.fish": "",
+      "shell/key-bindings.zsh": "",
+      "legacy/OldThing.py": "",
+      "legacy/deep/AnotherOne.py": "",
+    });
+    const report = await checkProject(store, "strict", project);
+    expect(report.violations.map((v) => `${v.rule} ${v.path}`)).toEqual([
+      "layout docs/",
+      "naming shell/key-bindings.zsh",
+    ]);
+    expect(report.ignored).toBe(4);
+    // An ignored fixable violation is not fixed either.
+    await checkProject(store, "strict", project, { fix: true });
+    expect(await Bun.file(join(project, "CHANGELOG.md")).exists()).toBe(false);
+    expect(await Bun.file(join(project, "docs/.gitkeep")).exists()).toBe(true);
+  });
+
+  test("a marker that does not parse is a diagnostic, and nothing is ignored", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "strict", naming: { files: "snake_case" } });
+    const project = await repo({
+      ".dolly": "pattern: strict\nignore:\n  - ../outside\n",
+      "Bad-Name.py": "",
+    });
+    const report = await checkProject(store, "strict", project);
+    expect(report.violations.map((v) => v.path)).toEqual(["Bad-Name.py"]);
+    expect(report.ignored).toBe(0);
+    expect(report.diagnostics[0]).toContain(".dolly is not a valid marker");
+  });
+
   test("two creates aimed at one path: captured bytes beat the layout stub, reported once", async () => {
     // The layout rule used to want .editorconfig to exist (empty stub) while
     // the config rule wanted it to hold the captured bytes. Unreconciled,

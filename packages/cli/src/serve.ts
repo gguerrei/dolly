@@ -11,7 +11,6 @@ import {
   aiStatus,
   assistedFit,
   assistedFitApply,
-  type CheckReport,
   checkProject,
   connectAi,
   draftConventions,
@@ -25,6 +24,8 @@ import {
   InvalidBundleError,
   InvalidPatternNameError,
   importBundle,
+  linkProject,
+  MarkerError,
   PatternExistsError,
   PatternNotFoundError,
   PatternParseError,
@@ -43,8 +44,9 @@ import {
   useAi,
   watchLearning,
   watchProject,
-} from "@dolly/core";
+} from "@dollysheep/core";
 import pkg from "../package.json";
+import { checkView } from "./views";
 
 /**
  * `dolly serve`: the engine's one door for the GUI (docs/design/gui.md).
@@ -79,14 +81,6 @@ export interface DollyServer {
   /** Whether a built webview is being served at `/`. */
   uiAvailable: boolean;
   stop(): void;
-}
-
-/** The wire shape of a violation: the FixPlan collapses to `fixable`, since the GUI acts on plans rather than parsing them. */
-interface CheckView {
-  pattern: string;
-  violations: { rule: string; path: string; message: string; fixable: boolean }[];
-  fixed: string[];
-  diagnostics: string[];
 }
 
 // In a repo checkout the built webview sits beside the packages; the M9
@@ -358,9 +352,22 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     return json(report);
   }
 
+  if (path === "/api/link" && request.method === "POST") {
+    // `dolly link`: the marker written, the ignore list a marker already there carries kept.
+    const body = (await request.json()) as { dir?: string; pattern?: string };
+    if (!body.dir) return json({ error: "`dir` is required: the project directory to link." }, 400);
+    if (!body.pattern) return json({ error: "`pattern` is required." }, 400);
+    if (!(await store.has(body.pattern))) throw new PatternNotFoundError(body.pattern);
+    return json({ pattern: body.pattern, ...(await linkProject(body.dir, body.pattern)) });
+  }
+
   if (path === "/api/import" && request.method === "POST") {
     const body = (await request.json()) as { file?: string; force?: boolean };
-    if (!body.file) return json({ error: "`file` is required: the .dolly bundle to import." }, 400);
+    if (!body.file)
+      return json(
+        { error: "`file` is required: the .dolly bundle to import, a path or an https URL." },
+        400,
+      );
     const pattern = await importBundle(store, body.file, { force: body.force });
     return json({ name: pattern.name, description: pattern.description });
   }
@@ -512,20 +519,6 @@ function watchStream(store: PatternStore, name: string, dir: string, request: Re
   });
 }
 
-function checkView(pattern: string, report: CheckReport): CheckView {
-  return {
-    pattern,
-    violations: report.violations.map((v) => ({
-      rule: v.rule,
-      path: v.path,
-      message: v.message,
-      fixable: v.fix !== undefined,
-    })),
-    fixed: report.fixed,
-    diagnostics: report.diagnostics,
-  };
-}
-
 /**
  * The webview itself: public code, no data, so no token, because the page must be
  * able to load before its script reads the token from the fragment.
@@ -563,6 +556,7 @@ function errorResponse(error: unknown): Response {
   if (error instanceof FitGitError) return json({ error: error.message }, 409);
   if (error instanceof PatternNotFoundError) return json({ error: error.message }, 404);
   if (error instanceof InvalidPatternNameError) return json({ error: error.message }, 400);
+  if (error instanceof MarkerError) return json({ error: error.message }, 400);
   if (error instanceof PatternParseError) return json({ error: error.message }, 422);
   // A key the provider refused, or the caller's own mistake: bad requests, in plain words.
   if (error instanceof AiProviderError || error instanceof AiUsageError) {

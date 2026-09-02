@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PatternStore } from "@dolly/core";
+import { PatternStore } from "@dollysheep/core";
 import pkg from "../package.json";
 import { type DollyServer, serveDolly } from "../src/serve";
 
@@ -431,6 +431,24 @@ describe("dolly serve", () => {
       body: JSON.stringify({ file: join(project, "package.json") }),
     });
     expect(notABundle.status).toBe(400);
+  });
+
+  test("link writes the marker over the wire, and an unknown pattern is a 404", async () => {
+    await seedPattern("tidy", DOCS_REQUIRED);
+    const dir = join(home, "to-link");
+    await mkdir(dir, { recursive: true });
+    const ok = await api("/api/link", {
+      method: "POST",
+      body: JSON.stringify({ dir, pattern: "tidy" }),
+    });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ pattern: "tidy" });
+    expect(await readFile(join(dir, ".dolly"), "utf8")).toBe("pattern: tidy\n");
+    const missing = await api("/api/link", {
+      method: "POST",
+      body: JSON.stringify({ dir, pattern: "nope" }),
+    });
+    expect(missing.status).toBe(404);
   });
 
   test("check without a pattern or marker explains itself", async () => {
