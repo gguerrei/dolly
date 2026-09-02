@@ -13,3 +13,6 @@ apps/desktop/src-tauri/target/
 .env.*
 *.log
 .DS_Store
+
+# Playwright MCP screenshots and logs
+.playwright-mcp/

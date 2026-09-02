@@ -88,10 +88,6 @@ function connect(): Promise<void> {
   }, `${provider.label} key verified and stored in the OS keychain.`);
 }
 
-function envVar(provider: AiProviderStatus): string {
-  return { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", google: "GEMINI_API_KEY" }[provider.id];
-}
-
 onMounted(load);
 </script>
 

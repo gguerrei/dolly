@@ -6,8 +6,9 @@ import { assistedFit } from "../src/ai/placement";
 import { assistedFitApply } from "../src/ai/translation";
 import { fitProject, type TranslateStep } from "../src/apply/fit";
 import { checkProject } from "../src/check/check";
-import { codeLanguagesOf, primaryExtensionOf } from "../src/extract/languages";
+import { classifyCode, primaryExtensionOf } from "../src/extract/languages";
 import type { PatternStore } from "../src/store";
+import { collectInventory } from "../src/tree/inventory";
 import { cleanupTempRoots, freshStore, repo, seed } from "./support";
 
 afterAll(cleanupTempRoots);
@@ -51,11 +52,40 @@ const translations = (plan: { steps: { kind: string }[] }) =>
   plan.steps.filter((s): s is TranslateStep => s.kind === "translate");
 
 describe("the languages rule", () => {
-  test("judges code by extension, and never data or docs", () => {
-    expect(codeLanguagesOf("src/a.py")).toEqual(["Python"]);
-    expect(codeLanguagesOf("README.md")).toEqual([]); // Markdown before GCC machine descriptions
-    expect(codeLanguagesOf("data.json")).toEqual([]);
+  test("judges code the way the vote reads it, and never data or docs", async () => {
+    // .md is Markdown before it is a GCC machine description, so it is not code.
+    const root = await repo({ "src/a.py": "x = 1\n", "README.md": "# r\n", "data.json": "{}\n" });
+    const { files } = await classifyCode(await collectInventory(root));
+    expect(files.map((f) => `${f.path}: ${f.language}`)).toEqual(["src/a.py: Python"]);
     expect(primaryExtensionOf("TypeScript")).toBe(".ts");
+  });
+
+  test("a trace is not a second language: a lone Dockerfile or script is never reported", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "ts", languages: { programming: ["TypeScript"] } });
+    const modules = Object.fromEntries(
+      ["a", "b", "c", "d", "e"].map((n) => [
+        `src/${n}.ts`,
+        `export const ${n} = "${n.repeat(40)}";\n`,
+      ]),
+    );
+    const quiet = await repo({
+      ...modules,
+      Dockerfile: "FROM node\n",
+      "scripts/setup.sh": "#!/bin/sh\necho hi\n",
+    });
+    const offPattern = (violations: { rule: string; path: string }[]) =>
+      violations.filter((v) => v.rule === "languages").map((v) => v.path);
+    expect(offPattern((await checkProject(store, "ts", quiet)).violations)).toEqual([]);
+
+    // Five files clear the bar whatever their bytes, and then every one is reported.
+    const shells = Object.fromEntries(
+      [1, 2, 3, 4, 5].map((n) => [`scripts/s${n}.sh`, "#!/bin/sh\n"]),
+    );
+    const busy = await repo({ ...modules, ...shells });
+    expect(offPattern((await checkProject(store, "ts", busy)).violations)).toEqual(
+      [1, 2, 3, 4, 5].map((n) => `scripts/s${n}.sh`),
+    );
   });
 
   test("reports every off-pattern code file, never fixable, and nothing without a languages facet", async () => {
@@ -153,10 +183,16 @@ describe("translation", () => {
 
   test("two sources with one stem cannot both become the same file", async () => {
     const { store, root } = await pythonProject({});
+    // Two shell files, so Shell clears the bar and is a language to translate, not a trace.
     await writeFile(join(root, "src/greet.sh"), "echo hi\n");
+    await writeFile(join(root, "src/tools.sh"), "echo tools\n");
     await turnOn();
     const plan = await assistedFit(store, "ts-service", root);
-    expect(translations(plan).map((s) => s.to)).toEqual(["src/greet.ts", "src/main.ts"]);
+    expect(translations(plan).map((s) => s.to)).toEqual([
+      "src/greet.ts",
+      "src/main.ts",
+      "src/tools.ts",
+    ]);
     expect(plan.declined.map((d) => d.message)).toContain(
       "written in Shell; the pattern sanctions TypeScript, but src/greet.ts already exists (or two translations collide there)",
     );

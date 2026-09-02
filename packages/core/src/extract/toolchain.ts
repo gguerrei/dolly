@@ -7,6 +7,7 @@ import { parseTomlSafe, readJsonSafe } from "../tree/files";
 import { type Inventory, rootFiles as rootEvidenceFiles } from "../tree/inventory";
 import { hasMachinePath } from "./capture";
 import type { Ecosystem } from "./registry";
+import { detectReleaseTool } from "./releases";
 
 /**
  * Detects the tools a project is built with from structural fingerprints
@@ -375,6 +376,15 @@ export async function scanToolchain(
     }
   }
 
+  // A release tool's root config is captured like a hook manager's, so
+  // `new` writes it back and the config rule owns it, with the releases
+  // rule standing down for a captured one. Only a file can be captured; a
+  // `.changeset/` directory stays the author's to add.
+  const releaseConfig = (await detectReleaseTool(inventory))?.fingerprints.find(
+    (fingerprint) => !fingerprint.endsWith("/") && rootFiles.has(fingerprint),
+  );
+  if (releaseConfig) await captureConfig(releaseConfig);
+
   const bySecondaryEco = new Map<string, string[]>();
   for (const c of dedupe(secondary)) {
     const list = bySecondaryEco.get(c.ecosystem) ?? [];
@@ -469,7 +479,7 @@ function gatedCapture(sourceId: string, contents: string, notes: string[]): Cand
   return { file: `toolchain/${basename}`, contents };
 }
 
-/** Recipes may take parameters (`build target:`), list deps, or be quiet (`@test:`). */
+/** pyproject.toml parsed, with a note when it will not parse, since its tool tables feed several roles. */
 async function readTomlSafe(
   absPath: string,
   notes: string[],

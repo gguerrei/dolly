@@ -41,8 +41,12 @@ export const releasesRule: Rule = {
     }
 
     const tool = RELEASE_TOOLS.find((t) => t.id === releases.tool);
-    // A tool dolly does not know cannot be fingerprinted, so it is the author's to check.
-    if (tool && (await detectReleaseTool(inventory))?.id !== tool.id) {
+    // A captured config is the config rule's to judge (presence, and a real
+    // create-fix), as with hook managers; a tool dolly does not know cannot
+    // be fingerprinted, so it is the author's to check.
+    const captured = Object.keys(pattern.toolchain?.configs ?? {});
+    const owned = tool?.fingerprints.some((fingerprint) => captured.includes(fingerprint)) ?? false;
+    if (tool && !owned && (await detectReleaseTool(inventory))?.id !== tool.id) {
       const expected = tool.fingerprints[0] ?? `[tool.${tool.pyprojectTable}] in pyproject.toml`;
       violations.push({
         rule: "releases",

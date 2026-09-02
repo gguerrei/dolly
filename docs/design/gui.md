@@ -4,10 +4,9 @@ How dolly gets a face: a local daemon (`dolly serve`) that is the engine's
 one door, and a webview app (`apps/desktop`) that browses, edits, and checks
 through it. Designed at M5; two maintainer decisions (2026-08-12) shape it:
 the webview is **Vue 3 + Vite**, and the milestone lands **web-first**. The
-daemon and UI are built and verified in a browser now; the Tauri shell wraps
-them once the Rust toolchain and webkit system libraries exist on the dev
-machine. Nothing web-first builds is thrown away: wrapping a served webview
-is Tauri's ordinary dev flow.
+daemon and UI were built and verified in a browser first; the Tauri shell
+(wrapped 2026-08-13, "The native shell" below) is a window around that same
+pair, so nothing web-first built was thrown away.
 
 ## Ground rules
 
@@ -18,9 +17,9 @@ is Tauri's ordinary dev flow.
 2. **The daemon is a verb of the one binary.** `dolly serve` lives in
    `@dolly/cli` beside the other verbs (one install, one door) and stays
    thin the way the CLI is thin: every route is a barrel export plus a JSON
-   view, no logic of its own. When M6 makes fixes serializable data, the
-   views shrink; until then the daemon maps closures to `fixable: true` at
-   the door.
+   view, no logic of its own. Since M6 made fixes serializable data, a
+   report crosses the wire as itself; the check view only collapses each fix
+   to `fixable: true`, since the GUI acts on plans rather than parsing them.
 3. **Local means proven local.** The daemon binds 127.0.0.1 only, and every
    `/api` request must carry a per-run random bearer token in the
    `Authorization` header. The token rides the printed URL's *fragment*

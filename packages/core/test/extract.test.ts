@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { symlink } from "node:fs/promises";
 import { join } from "node:path";
+import { checkProject } from "../src/check/check";
 import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
-import { scanNaming } from "../src/extract/naming";
+import { normalizeStem, scanNaming } from "../src/extract/naming";
 import { parsePatternDocument, serializePatternDocument } from "../src/pattern/document";
 import { collectInventory } from "../src/tree/inventory";
 import { cleanupTempRoots, freshStore, repo } from "./support";
@@ -68,6 +69,83 @@ describe("naming scanner", () => {
     const scan = scanNaming(await collectInventory(root));
     expect(scan.naming).toBeUndefined();
     expect(scan.notes.join("\n")).toContain("mixed");
+  });
+
+  test("a facet must cover the names that abstained, since check judges every one", async () => {
+    // Five PascalCase components against twelve single-word modules: the
+    // distinctive names agree on PascalCase, but check would flag every
+    // module, so the pattern must not say it.
+    const modules = [
+      "fit",
+      "check",
+      "store",
+      "learn",
+      "serve",
+      "export",
+      "extract",
+      "naming",
+      "layout",
+      "schema",
+      "bundle",
+      "brief",
+    ];
+    const root = await repo({
+      "src/App.vue": "",
+      "src/LibraryView.vue": "",
+      "src/PatternView.vue": "",
+      "src/CheckView.vue": "",
+      "src/FitView.vue": "",
+      ...Object.fromEntries(modules.map((name) => [`src/${name}.ts`, "export {};\n"])),
+    });
+    const scan = scanNaming(await collectInventory(root));
+    expect(scan.naming?.files).toBeUndefined();
+    expect(scan.naming?.extensions[".vue"]).toBe("PascalCase");
+    expect(scan.notes.join("\n")).toContain("lean PascalCase");
+
+    const store = await freshStore();
+    const { document } = await extractPattern(root, "abstainers");
+    await store.save(document);
+    const violations = (await checkProject(store, "abstainers", root)).violations;
+    expect(violations.filter((v) => v.rule === "naming")).toEqual([]);
+  });
+
+  test("a small extension that always dissents is noted, with the override that settles it", async () => {
+    // Thirteen snake_case Go files carry the vote over three kebab-case scripts.
+    const go = [
+      "index_byte",
+      "read_line",
+      "wide_char",
+      "term_size",
+      "key_map",
+      "run_loop",
+      "ansi_code",
+      "term_info",
+      "char_class",
+      "byte_pool",
+      "event_loop",
+      "file_walk",
+      "exit_code",
+    ];
+    const root = await repo({
+      ...Object.fromEntries(go.map((name) => [`src/${name}.go`, ""])),
+      "shell/key-bindings.fish": "",
+      "shell/completion-examples.fish": "",
+      "shell/key-bindings.zsh": "",
+    });
+    const scan = scanNaming(await collectInventory(root));
+    expect(scan.naming?.files).toBe("snake_case");
+    expect(scan.naming?.extensions).toEqual({});
+    expect(scan.notes).toEqual([
+      "2 .fish files (kebab-case where distinctive) do not follow the snake_case files convention, so check will report them; add a naming.extensions entry for .fish if that is intentional.",
+      "1 .zsh file (kebab-case where distinctive) do not follow the snake_case files convention, so check will report them; add a naming.extensions entry for .zsh if that is intentional.",
+    ]);
+  });
+
+  test("pytest's test_ prefix is idiom, not case, like Go's _test suffix", () => {
+    expect(normalizeStem("test__detect_program_name")).toBe("detect_program_name");
+    expect(normalizeStem("test_utils")).toBe("utils");
+    expect(normalizeStem("testing")).toBe("testing");
+    expect(normalizeStem("__init__")).toBe("init");
   });
 
   test("mandated names and .github wizard files never vote", async () => {
@@ -578,6 +656,23 @@ describe("extract end to end", () => {
       "src/a.ts": "",
     });
     expect((await extractPattern(root, "gnu")).document.pattern.license).toBe("GPL-3.0-only");
+  });
+
+  test("a dual-licensed crate's LICENSE-MIT and LICENSE-APACHE are license files, and its check is clean", async () => {
+    const root = await repo({
+      "Cargo.toml": '[package]\nname = "hf"\nversion = "1.0.0"\nlicense = "MIT OR Apache-2.0"\n',
+      "LICENSE-APACHE":
+        "                                 Apache License\n                           Version 2.0, January 2004\n",
+      "LICENSE-MIT":
+        "MIT License\n\nCopyright (c) 2026 hf\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n",
+      "src/main.rs": "fn main() {}\n",
+    });
+    const { document, files } = await extractPattern(root, "hf");
+    expect(document.pattern.license).toBe("MIT OR Apache-2.0");
+    const store = await freshStore();
+    await saveExtractedPattern(store, { document, files });
+    const report = await checkProject(store, "hf", root);
+    expect(report.violations.filter((v) => v.rule === "license")).toEqual([]);
   });
 
   test("an SPDX expression agrees with a LICENSE carrying any one of its ids", async () => {

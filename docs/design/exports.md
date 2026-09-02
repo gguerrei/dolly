@@ -76,7 +76,9 @@ The `releases` rule is tree-only: a pattern with `changelog:
 keep-a-changelog` and no `CHANGELOG.md` gets a create fix with the
 format's header; a pattern naming a `tool` whose fingerprint is missing
 is reported with the file to add, never fixed (tool configs are the
-author's). There is no `commits` rule: a commit is not a path, and the
+author's), unless extract captured the tool's root config file, which it
+does the way it captures a hook manager's: then `new` writes it back and
+the config rule creates it. There is no `commits` rule: a commit is not a path, and the
 tree-side enforcement of message grammar is a commitlint or commitizen
 config, which the config rule already compares when the pattern captured
 one.
@@ -107,8 +109,9 @@ level so the author's structure survives inside the export's.
 - Daemon: `GET /api/export?pattern&as` returns `{ target, path, contents }`
   for the preview; `POST /api/export` with `{ dir, pattern, as, force? }`
   writes the file at its default path under `dir` (409 when it exists
-  and `force` is not set). The bundle stays a CLI target until the native
-  shell's file picker lands (M9), like import.
+  and `force` is not set). `{ out, pattern, as: "bundle" }` writes the bundle where the native
+  shell's save dialog chose (M9), and a bundle comes in through
+  `POST /api/import` the same way.
 - GUI: the export view, designed on the canvas first: pick a target,
   preview the rendered file, save it into the project directory the other
   views share, or copy it. The pattern view's overview shows the two new

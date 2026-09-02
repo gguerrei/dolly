@@ -120,19 +120,126 @@ export function extensionsOfLanguages(names: string[]): Set<string> {
 }
 
 /**
- * The code languages a file could be written in, judged by its extension
- * alone; empty for data, docs, and assets. Several names mean an ambiguous
- * extension (.h is C or C++), which callers treat as all of them; an
- * extension with a non-code reading (.md is Markdown before it is a GCC
- * machine description) is not code at all.
+ * The code files the vote reads, each resolved to one language: an
+ * ambiguous extension goes to its default unless a programming-type
+ * sibling with more unambiguous bytes claims it (a repo of .cpp files
+ * rightly claims .h for C++). Data, docs, and assets are absent. Check reads
+ * the tree through this same function, so a file is code, and is in a given
+ * language, the same way for extract and for the rule.
  */
-export function codeLanguagesOf(path: string): string[] {
-  const base = path.split("/").pop() ?? path;
-  const byName = byFilename.get(base);
-  if (byName) return isCode(byName) ? [byName.name] : [];
-  const candidates = candidatesByExtension(base)?.candidates ?? [];
-  if (candidates.length === 0 || candidates.some((entry) => !isCode(entry))) return [];
-  return candidates.map((entry) => entry.name);
+export interface CodeFile {
+  path: string;
+  size: number;
+  language: string;
+}
+
+export async function classifyCode(
+  inventory: Inventory,
+): Promise<{ files: CodeFile[]; unclassifiedBytes: number }> {
+  const resolved: {
+    path: string;
+    size: number;
+    entry: LanguageEntry;
+    ambiguous?: { extension: string; candidates: LanguageEntry[] };
+  }[] = [];
+  let unclassifiedBytes = 0;
+
+  for (const file of inventory.files) {
+    const basename = file.path.slice(file.path.lastIndexOf("/") + 1);
+    const exact = byFilename.get(basename);
+    if (exact) {
+      resolved.push({ path: file.path, size: file.size, entry: exact });
+      continue;
+    }
+    const match = candidatesByExtension(basename);
+    if (match) {
+      const [first] = match.candidates as [LanguageEntry, ...LanguageEntry[]];
+      resolved.push({
+        path: file.path,
+        size: file.size,
+        entry: first,
+        ...(match.candidates.length > 1 ? { ambiguous: match } : {}),
+      });
+      continue;
+    }
+    if (!basename.includes(".")) {
+      const viaShebang = await classifyByShebang(join(inventory.root, file.path));
+      if (viaShebang) {
+        resolved.push({ path: file.path, size: file.size, entry: viaShebang });
+        continue;
+      }
+    }
+    const lastDot = basename.lastIndexOf(".");
+    if (lastDot <= 0 || !ASSET_EXTENSIONS.has(basename.slice(lastDot).toLowerCase())) {
+      unclassifiedBytes += file.size;
+    }
+  }
+
+  // Ambiguous extensions resolve default-first (.md is Markdown, .ts is
+  // TypeScript); only a programming-type sibling with more unambiguous bytes
+  // can override.
+  const unambiguousBytes = new Map<string, number>();
+  for (const r of resolved) {
+    if (!r.ambiguous)
+      unambiguousBytes.set(r.entry.name, (unambiguousBytes.get(r.entry.name) ?? 0) + r.size);
+  }
+  const bytesOf = (entry: LanguageEntry | undefined) =>
+    entry ? (unambiguousBytes.get(entry.name) ?? 0) : 0;
+  for (const r of resolved) {
+    if (!r.ambiguous) continue;
+    const fallback = r.ambiguous.candidates.find(
+      (c) => c.name === AMBIGUOUS_DEFAULTS[r.ambiguous?.extension ?? ""],
+    );
+    const challenger = r.ambiguous.candidates
+      .filter((c) => isCode(c) && c !== fallback)
+      .sort((a, b) => bytesOf(b) - bytesOf(a) || (a.name < b.name ? -1 : 1))[0];
+    if (challenger && bytesOf(challenger) > bytesOf(fallback)) r.entry = challenger;
+    else if (fallback) r.entry = fallback;
+    else r.entry = challenger ?? (r.ambiguous.candidates[0] as LanguageEntry);
+  }
+
+  return {
+    files: resolved
+      .filter((r) => isCode(r.entry))
+      .map((r) => ({ path: r.path, size: r.size, language: r.entry.name })),
+    unclassifiedBytes,
+  };
+}
+
+export interface LanguageShare {
+  files: number;
+  bytes: number;
+}
+
+/** Files and bytes per language, and the code bytes they add up to. */
+export function languageShares(files: CodeFile[]): {
+  shares: Map<string, LanguageShare>;
+  codeBytes: number;
+} {
+  const shares = new Map<string, LanguageShare>();
+  let codeBytes = 0;
+  for (const { language, size } of files) {
+    const share = shares.get(language) ?? { files: 0, bytes: 0 };
+    share.files += 1;
+    share.bytes += size;
+    shares.set(language, share);
+    codeBytes += size;
+  }
+  return { shares, codeBytes };
+}
+
+/**
+ * The facet bar: at least 2 files and 1% of the code bytes, or 5 files.
+ * Below it a language is a trace (a lone Dockerfile, one helper script):
+ * extract notes it instead of sanctioning it, and check does not hold it
+ * against the pattern either.
+ */
+export function clearsLanguageBar(share: LanguageShare, codeBytes: number): boolean {
+  return (
+    (share.files >= LANGUAGES_TUNING.minFiles &&
+      share.bytes * 100 >= codeBytes * LANGUAGES_TUNING.minSharePercent) ||
+    share.files >= LANGUAGES_TUNING.soloFiles
+  );
 }
 
 /** The extension a file in this language is written with, as the language table lists it first. */
@@ -164,98 +271,25 @@ function isCode(entry: LanguageEntry): boolean {
 }
 
 async function detectProgramming(inventory: Inventory, notes: string[]): Promise<string[]> {
-  const resolved: {
-    entry: LanguageEntry;
-    size: number;
-    ambiguous?: { extension: string; candidates: LanguageEntry[] };
-  }[] = [];
-  let unclassifiedBytes = 0;
+  const { files, unclassifiedBytes } = await classifyCode(inventory);
+  const { shares, codeBytes } = languageShares(files);
 
-  for (const file of inventory.files) {
-    const basename = file.path.slice(file.path.lastIndexOf("/") + 1);
-    const exact = byFilename.get(basename);
-    if (exact) {
-      resolved.push({ entry: exact, size: file.size });
-      continue;
-    }
-    const match = candidatesByExtension(basename);
-    if (match) {
-      const [first] = match.candidates as [LanguageEntry, ...LanguageEntry[]];
-      resolved.push({
-        entry: first,
-        size: file.size,
-        ...(match.candidates.length > 1 ? { ambiguous: match } : {}),
-      });
-      continue;
-    }
-    if (!basename.includes(".")) {
-      const viaShebang = await classifyByShebang(join(inventory.root, file.path));
-      if (viaShebang) {
-        resolved.push({ entry: viaShebang, size: file.size });
-        continue;
-      }
-    }
-    const lastDot = basename.lastIndexOf(".");
-    if (lastDot <= 0 || !ASSET_EXTENSIONS.has(basename.slice(lastDot).toLowerCase())) {
-      unclassifiedBytes += file.size;
-    }
-  }
-
-  // Ambiguous extensions resolve default-first (.md is Markdown, .ts is
-  // TypeScript); only a programming-type sibling with more unambiguous bytes
-  // can override (a repo of .cpp files rightly claims .h for C++).
-  const unambiguousBytes = new Map<string, number>();
-  for (const r of resolved) {
-    if (!r.ambiguous)
-      unambiguousBytes.set(r.entry.name, (unambiguousBytes.get(r.entry.name) ?? 0) + r.size);
-  }
-  const bytesOf = (entry: LanguageEntry | undefined) =>
-    entry ? (unambiguousBytes.get(entry.name) ?? 0) : 0;
-  for (const r of resolved) {
-    if (!r.ambiguous) continue;
-    const fallback = r.ambiguous.candidates.find(
-      (c) => c.name === AMBIGUOUS_DEFAULTS[r.ambiguous?.extension ?? ""],
-    );
-    const challenger = r.ambiguous.candidates
-      .filter((c) => isCode(c) && c !== fallback)
-      .sort((a, b) => bytesOf(b) - bytesOf(a) || (a.name < b.name ? -1 : 1))[0];
-    if (challenger && bytesOf(challenger) > bytesOf(fallback)) r.entry = challenger;
-    else if (fallback) r.entry = fallback;
-    else r.entry = challenger ?? (r.ambiguous.candidates[0] as LanguageEntry);
-  }
-
-  const stats = new Map<string, { bytes: number; files: number }>();
-  let codeBytes = 0;
-  for (const { entry, size } of resolved) {
-    if (!isCode(entry)) continue;
-    const stat = stats.get(entry.name) ?? { bytes: 0, files: 0 };
-    stat.bytes += size;
-    stat.files += 1;
-    stats.set(entry.name, stat);
-    codeBytes += size;
-  }
-
-  const sanctioned = [...stats.entries()]
-    .filter(
-      ([, s]) =>
-        (s.files >= LANGUAGES_TUNING.minFiles &&
-          s.bytes * 100 >= codeBytes * LANGUAGES_TUNING.minSharePercent) ||
-        s.files >= LANGUAGES_TUNING.soloFiles,
-    )
+  const sanctioned = [...shares.entries()]
+    .filter(([, share]) => clearsLanguageBar(share, codeBytes))
     .sort(([an, a], [bn, b]) => b.bytes - a.bytes || (an < bn ? -1 : 1))
     .map(([name]) => name);
 
   if (codeBytes > 0) {
-    const shares = [...stats.entries()]
+    const ranked = [...shares.entries()]
       .sort(([an, a], [bn, b]) => b.bytes - a.bytes || (an < bn ? -1 : 1))
       .map(([name, s]) => {
         const pct = Math.round((s.bytes / codeBytes) * 100);
         return `${name} ${pct === 0 ? "<1" : pct}%`;
       });
     notes.push(
-      `Language mix at extraction: ${shares.join(", ")} (by bytes; data and prose files excluded).`,
+      `Language mix at extraction: ${ranked.join(", ")} (by bytes; data and prose files excluded).`,
     );
-    for (const [name, s] of [...stats.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    for (const [name, s] of [...shares.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
       if (!sanctioned.includes(name)) {
         notes.push(
           `Traces of ${name} (${s.files} file${s.files === 1 ? "" : "s"}) fall below the facet threshold; add it to languages.programming if intentional.`,

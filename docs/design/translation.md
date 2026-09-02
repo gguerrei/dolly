@@ -20,9 +20,12 @@ else changes.
 
 1. **The pattern dictates through `languages.programming`.** The list is
    the sanctioned set, dominant language first. A code file whose
-   extension belongs to a language outside that list is off-pattern; a
-   file whose extension belongs to no language (data, docs, assets) is
-   not code and is never judged. The target of a translation is the
+   extension belongs to a language outside that list is off-pattern when
+   the tree carries that language at the extractor's own facet bar (two
+   files and 1% of the code bytes, or five files); a lone Dockerfile or
+   helper script is a trace, not a second language, and a file whose
+   extension belongs to no language (data, docs, assets) is not code, so
+   neither is ever judged. The target of a translation is the
    pattern's dominant language, and the target path is the source path
    with that language's primary extension (`src/auth/login.py` to
    `src/auth/login.ts`). Naming and placement rules apply to the result

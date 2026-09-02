@@ -89,7 +89,14 @@ export const licenseRule: Rule = {
 
     const licensePath = findLicenseFile(inventory);
     if (!licensePath) {
-      const candidates = ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"];
+      const candidates = [
+        "LICENSE",
+        "LICENSE.md",
+        "LICENSE.txt",
+        "LICENSE-MIT",
+        "LICENSE-APACHE",
+        "COPYING",
+      ];
       const onDisk = (
         await Promise.all(
           candidates.map(async (name) => ((await existsOnDisk(root, name)) ? name : undefined)),
