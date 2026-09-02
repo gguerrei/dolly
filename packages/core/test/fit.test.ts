@@ -318,7 +318,9 @@ describe("fitApply", () => {
     expect(fitApply(store, "kebab", dirty)).rejects.toThrow("dirty");
   });
 
-  test("a half-applied tree is never committed", async () => {
+  // A read-only directory is how the rename is made to fail, and Windows
+  // permissions do not refuse a rename that way, so the case is POSIX-only.
+  test.skipIf(process.platform === "win32")("a half-applied tree is never committed", async () => {
     const store = await freshStore();
     await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
     // One step that will land (the env append) and one that will fail (the

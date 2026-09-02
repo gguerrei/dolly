@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import pkg from "../package.json";
 
-const CLI = new URL("../src/main.ts", import.meta.url).pathname;
+// fileURLToPath, not pathname: a URL pathname on Windows is "/D:/...", which nothing can open.
+const CLI = fileURLToPath(new URL("../src/main.ts", import.meta.url));
 
 let home: string;
 

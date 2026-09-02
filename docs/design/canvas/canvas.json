@@ -134,6 +134,15 @@
       "w": 1440,
       "h": 900,
       "page": "flows"
+    },
+    {
+      "file": "PatternProse.dc.html",
+      "title": "Pattern, conventions rendered",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "conventions"
     }
   ],
   "annotations": [
@@ -184,11 +193,19 @@
       "w": 340,
       "page": "flows",
       "text": "The three flows the native shell's pickers unlock (M9): extract and import from the library's head, a new project from the pattern view's head, each as an inline panel in the house style with Browse beside the path. In a plain browser the path is typed and Browse is absent; the verbs read the same.\n\nBehind them: POST /api/extract, /api/new, /api/import, and the bundle on POST /api/export with a save dialog's path. A pattern or directory that already exists is a 409 the panel turns into Replace or Keep mine."
+    },
+    {
+      "id": "conventions-note",
+      "x": 1540,
+      "y": 0,
+      "w": 340,
+      "page": "conventions",
+      "text": "The conventions panel rendering pattern.md's body instead of showing the raw text: ## headings as panel subheads (uppercase, a rule above), ### headings as bold lines, bullets as a list, code spans as chips, paragraphs that wrap. Long prose folds after the first notes the way the layout list does, with Show all.\n\nEverything else is the Pattern board as it stands, so the two can be compared side by side on the App page. The port renders the body with a small markdown renderer in the webview; Source keeps the raw text for editing."
     }
   ],
   "launch": {
     "view": "canvas",
-    "page": "flows"
+    "page": "conventions"
   },
   "pages": [
     {
@@ -214,6 +231,10 @@
     {
       "id": "flows",
       "name": "Flows"
+    },
+    {
+      "id": "conventions",
+      "name": "Conventions"
     }
   ]
 }
