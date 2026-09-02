@@ -1009,7 +1009,7 @@ describe("extract end to end", () => {
   });
 
   test("several repositories yield what they agree on, and the notes say what they do not", async () => {
-    const service = (name: string, extras: Record<string, string>) => ({
+    const service = (name: string, extras: Record<string, string>): Record<string, string> => ({
       "package.json": JSON.stringify({
         name,
         license: "MIT",
