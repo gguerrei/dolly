@@ -42,13 +42,13 @@ export async function exportBundle(
   return out;
 }
 
-/** Unpack a .dolly file into the store and return the pattern it contained. */
+/** Unpack a .dolly file, from a path or an http(s) URL, into the store and return the pattern it contained. */
 export async function importBundle(
   store: PatternStore,
-  bundlePath: string,
+  source: string,
   options: { force?: boolean } = {},
 ): Promise<Pattern> {
-  const entries = await readBundle(bundlePath);
+  const entries = await readBundle(source);
   const files = Object.entries(entries).filter(([path]) => !path.endsWith("/"));
   for (const [path] of files) {
     // The same gate every pattern-supplied path passes. Bundles are the
@@ -57,7 +57,7 @@ export async function importBundle(
       throw new InvalidBundleError(`The bundle entry "${path}" escapes the pattern directory.`);
     }
   }
-  const doc = parseBundledPattern(entries[PATTERN_FILE], bundlePath);
+  const doc = parseBundledPattern(entries[PATTERN_FILE], source);
   const name = doc.pattern.name;
 
   // Everything above validated the whole bundle; only now does the store change.
@@ -75,11 +75,14 @@ export async function importBundle(
 }
 
 /** Unzip with sanity caps so a tiny malicious file can't balloon into memory or disk. */
-async function readBundle(bundlePath: string): Promise<Record<string, Uint8Array>> {
+async function readBundle(source: string): Promise<Record<string, Uint8Array>> {
   let entryCount = 0;
   let declaredBytes = 0;
   try {
-    const entries = unzipSync(new Uint8Array(await readFile(bundlePath)), {
+    const bytes = /^https?:\/\//.test(source)
+      ? await fetchBundle(source)
+      : new Uint8Array(await readFile(source));
+    const entries = unzipSync(bytes, {
       filter: (file) => {
         entryCount += 1;
         declaredBytes += file.originalSize;
@@ -96,9 +99,29 @@ async function readBundle(bundlePath: string): Promise<Record<string, Uint8Array
   } catch (cause) {
     if (cause instanceof InvalidBundleError) throw cause;
     throw new InvalidBundleError(
-      `Could not read "${bundlePath}" as a .dolly bundle: ${(cause as Error).message}`,
+      `Could not read "${source}" as a .dolly bundle: ${(cause as Error).message}`,
     );
   }
+}
+
+/** A bundle from the web, under the same size cap as one on disk, so a link is as safe as a file. */
+async function fetchBundle(url: string): Promise<Uint8Array> {
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+  } catch (cause) {
+    throw new InvalidBundleError(`Could not fetch "${url}": ${(cause as Error).message}`);
+  }
+  if (!response.ok)
+    throw new InvalidBundleError(`Could not fetch "${url}": HTTP ${response.status}`);
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for await (const chunk of response.body ?? []) {
+    total += chunk.length;
+    assertReasonableSize(1, total);
+    chunks.push(chunk);
+  }
+  return new Uint8Array(Buffer.concat(chunks));
 }
 
 function assertReasonableSize(entryCount: number, totalBytes: number): void {

@@ -10,12 +10,12 @@ pair, so nothing web-first built was thrown away.
 
 ## Ground rules
 
-1. **One engine, one door.** The GUI never links `@dolly/core`; it speaks
+1. **One engine, one door.** The GUI never links `@dollysheep/core`; it speaks
    HTTP/JSON to `dolly serve`, which binds the same curated barrel the CLI
    binds. CLI/GUI parity holds by construction, exactly as `watchProject`
    already proved: the engine owns behavior, the edges only render it.
 2. **The daemon is a verb of the one binary.** `dolly serve` lives in
-   `@dolly/cli` beside the other verbs (one install, one door) and stays
+   `dollysheep` beside the other verbs (one install, one door) and stays
    thin the way the CLI is thin: every route is a barrel export plus a JSON
    view, no logic of its own. Since M6 made fixes serializable data, a
    report crosses the wire as itself; the check view only collapses each fix
@@ -68,7 +68,8 @@ that does not validate).
 | `POST /api/export` | `exportPattern` | `{ dir, pattern?, as, force? }` writes the file at the target's own path under `dir` (409 until `force`); `{ out, pattern, as: "bundle" }` writes the bundle where the native save dialog chose |
 | `POST /api/extract` | `extractPattern` + `saveExtractedPattern` | `{ dir, name?, force? }`: what was saved, the way `dolly extract` says it; an existing name is 409 until `force` |
 | `POST /api/new` | `scaffoldProject` | `{ pattern, dir }`: the `ScaffoldReport`; a directory that is not empty is 409 |
-| `POST /api/import` | `importBundle` | `{ file, force? }`: the pattern the bundle held; an existing name is 409 until `force`, a file that is not a bundle 400 |
+| `POST /api/import` | `importBundle` | `{ file, force? }`: the pattern the bundle held, from a path or an https URL; an existing name is 409 until `force`, a file that is not a bundle 400 |
+| `POST /api/link` | `linkProject` | `{ dir, pattern }`: `dolly link` over the wire; the marker written, an ignore list already there kept, and `replaced` naming the pattern the project was linked to before |
 | `GET /api/watch?dir&pattern` | `watchProject` | a held-open response streaming one JSON report per line (NDJSON, not SSE: `EventSource` cannot send the auth header, `fetch` can); closing the request disposes the watcher |
 
 The check view strips each violation to

@@ -53,7 +53,7 @@ and the pick rides along as a labeled suggestion; apply never reads it.
    demands in place declines too: that is the pattern contradicting
    itself, the author's to settle. Never a broken import applied silently.
 5. **The engine owns fit; the edges render it.** `fitProject` lives in
-   `@dolly/core` behind the barrel, the CLI prints the plan and asks
+   `@dollysheep/core` behind the barrel, the CLI prints the plan and asks
    nothing else, and the daemon can serve the same plan as JSON when the
    GUI grows a fit view. CLI/GUI parity by construction, as everywhere.
 

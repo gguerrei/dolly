@@ -38,13 +38,33 @@ subsets by default, and watch is a plain debounced re-run.
 
 ## The pattern link
 
-`dolly new` writes a `.dolly` marker at the project root (one YAML line,
-`pattern: <name>`), and it is meant to be committed, so the whole team checks
-against the same pattern. `dolly check` resolves the pattern in this order:
-an explicit argument beats the marker, the marker beats nothing, and with
-neither the command errors with a hint to pass a name. A marker naming a
-pattern this machine does not have degrades to the same hint (patterns are
-local; a teammate imports the bundle first).
+`dolly new` writes a `.dolly` marker at the project root, and `dolly link
+<pattern>` writes one into a project that already exists (`fit --apply`
+adds it as a create step when it is missing). It is a small YAML file,
+meant to be committed so the whole team checks against the same pattern:
+
+```yaml
+pattern: fastapi-service
+ignore:
+  - shell/*.fish
+  - legacy/
+```
+
+`dolly check` resolves the pattern in this order: an explicit argument beats
+the marker, the marker beats nothing, and with neither the command errors
+with a hint to pass a name. A marker naming a pattern this machine does not
+have degrades to the same hint (patterns are local; a teammate imports the
+bundle first). A marker that does not parse is a diagnostic, never silence.
+
+`ignore` (added 2026-09-01) is the project's own word on which paths check
+leaves alone: a mandated kebab-case script in a snake_case repo, a legacy
+file nobody may rename. Entries are relative paths with `*` and `**`; a
+directory entry covers everything under it. An ignored violation is neither
+reported nor fixed, every rule honors the list, and the report carries the
+count (`ignored`), so a clean run still says what it set aside. Fit plans
+in check's currency, so it never plans a move or a fix for an ignored path.
+`dolly check --json` prints the report in the daemon's wire shape, one
+line per report under `--watch`, for CI and editors.
 
 ## Config binding
 

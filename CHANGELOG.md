@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - M0 bootstrap: TypeScript monorepo using bun workspaces.
-- `@dolly/core`: pattern model (a pattern is a directory with a `pattern.md`:
+- `@dollysheep/core`: pattern model (a pattern is a directory with a `pattern.md`:
   YAML frontmatter facets plus Markdown prose conventions) and a local pattern
   store.
-- `@dolly/cli`: `dolly list`, `dolly show <name>`, `dolly delete <name>`, and
+- `dollysheep`: `dolly list`, `dolly show <name>`, `dolly delete <name>`, and
   `dolly home` commands.
 - `dependencies` facet: libraries by purpose (runtime and dev) plus a version
   policy, completing the v1 pattern schema.
@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fingerprinted from its config like every other toolchain role.
 - `watchProject` in the engine: the whole of `--watch` (debounce, deny-list
   pruning, no fixing by construction), so the CLI and the future GUI drive
-  the same loop. `@dolly/core`'s barrel is now a curated public surface
+  the same loop. `@dollysheep/core`'s barrel is now a curated public surface
   (one entry point per verb) instead of re-exporting internals.
 - `CheckReport.diagnostics`: pattern defects (a capture file missing from
   the pattern, an unsafe source id) surface apart from the project's

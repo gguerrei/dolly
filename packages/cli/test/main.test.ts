@@ -208,6 +208,49 @@ describe("dolly CLI", () => {
     expect(named.exitCode).toBe(0);
   });
 
+  test("link writes the marker, keeps its ignore list, and names what it replaced", async () => {
+    await seedPattern("tidy", ["---", "name: tidy", "---"].join("\n"));
+    await seedPattern("neat", ["---", "name: neat", "---"].join("\n"));
+    const project = join(home, "linked");
+    await mkdir(project, { recursive: true });
+    const first = await dolly("link", "tidy", "-C", project);
+    expect(first.exitCode).toBe(0);
+    expect(first.stdout).toContain(`Linked ${project} to "tidy"`);
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe("pattern: tidy\n");
+
+    await writeFile(join(project, ".dolly"), "pattern: tidy\nignore:\n  - legacy/\n");
+    const second = await dolly("link", "neat", "-C", project);
+    expect(second.stdout).toContain('it was linked to "tidy"');
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe(
+      "pattern: neat\nignore:\n  - legacy/\n",
+    );
+
+    const missing = await dolly("link", "nope", "-C", project);
+    expect(missing.exitCode).toBe(1);
+    expect(missing.stderr).toContain('No saved pattern named "nope"');
+  });
+
+  test("check --json prints the daemon's wire shape, the ignored count included", async () => {
+    await seedPattern(
+      "tidy",
+      ["---", "name: tidy", "layout:", "  - path: docs/", "    required: true", "---"].join("\n"),
+    );
+    const project = join(home, "json");
+    await mkdir(project, { recursive: true });
+    await writeFile(join(project, ".dolly"), "pattern: tidy\nignore:\n  - docs/\n");
+    const { stdout, exitCode } = await dolly("check", "-C", project, "--json");
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({
+      pattern: "tidy",
+      violations: [],
+      fixed: [],
+      diagnostics: [],
+      ignored: 1,
+    });
+    const plain = await dolly("check", "-C", project);
+    expect(plain.stdout).toContain("(1 violation ignored by .dolly)");
+  });
+
   test("fit previews as a dry run, then applies behind a checkpoint branch", async () => {
     await seedPattern(
       "kebab",

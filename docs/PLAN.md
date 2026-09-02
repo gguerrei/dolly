@@ -24,14 +24,14 @@ A maintainer rule since 2026-08-21: anything a person will look at (the mark, a 
 
 ```mermaid
 flowchart LR
-    subgraph engine ["@dolly/core (the engine)"]
+    subgraph engine ["@dollysheep/core (the engine)"]
         model[Pattern model<br/>pattern.md]
         extract[Extract<br/>scanners]
         apply[Apply<br/>new / check / fit]
         exporters[Exporters<br/>skills / bundles]
         ai[AI adapters<br/>BYOK, optional]
     end
-    cli["@dolly/cli: dolly command"] --> engine
+    cli["dollysheep: dolly command"] --> engine
     gui["apps/desktop: GUI webview"] --> serve["dolly serve: local daemon"] --> engine
 ```
 
@@ -85,7 +85,8 @@ dolly check [--fix] [--watch]     # lint-like enforcement               (M4, don
 dolly serve [--port] [--open]     # local daemon + browser GUI          (M5, done)
 dolly fit <pattern> [--apply]     # refit an existing project, dry-run default (M6, done)
 dolly export <pattern> [--as t] [--out f] # a .dolly bundle, or a skill/rule/AGENTS.md/prompt (M1 + M8, done)
-dolly import <file.dolly> [--force] # import a shared pattern           (M1, done)
+dolly import <file-or-url> [--force] # import a shared pattern         (M1, done; URLs 2026-09-01)
+dolly link <pattern> [-C dir]     # write the .dolly marker into an existing project (2026-09-01, done)
 dolly ai [status|connect|use|off] # BYOK provider setup                 (M7, done)
 dolly learn [pattern] [--once] [--yes] # watch a project, review drafted pattern edits (M7, done)
 ```
@@ -94,7 +95,7 @@ dolly learn [pattern] [--once] [--yes] # watch a project, review drafted pattern
 
 > **Release policy (maintainer decision, 2026-07-24):** the repo goes public on GitHub only once M1 through M8 exist as a complete end-to-end first draft. Until then, everything stays local.
 
-- **M0: Bootstrap** *(done 2026-07-24)*: monorepo (bun + Biome + strict TS), pattern format v1 + local store in `@dolly/core`, `dolly list/show/delete/home`, OSS hygiene (LICENSE, README, CONTRIBUTING, CoC, SECURITY, templates), CI, logo, this plan, ADRs 0001 and 0002.
+- **M0: Bootstrap** *(done 2026-07-24)*: monorepo (bun + Biome + strict TS), pattern format v1 + local store in `@dollysheep/core`, `dolly list/show/delete/home`, OSS hygiene (LICENSE, README, CONTRIBUTING, CoC, SECURITY, templates), CI, logo, this plan, ADRs 0001 and 0002.
 - **M1: Pattern ergonomics** *(done 2026-07-24)*: full v1 facet schemas incl. `dependencies`; `dolly edit` (opens `$EDITOR`, validates on save); great validation errors; `.dolly` bundle import/export (pulled forward from M8).
 - **M2: Extract** *(done 2026-07-24)*: the shared inventory walk plus five deterministic scanners (layout sibling-shape voting, naming majority vote, toolchain fingerprint matrix with configs captured as files, dependency manifests + purpose registry, language/runtime detection incl. natural language of docs), one consolidated schema diff (ADR-0003), `dolly extract [path] --name`. Low-confidence findings land in prose as counted notes, not facets. **Acceptance:** extracting from 3 real repos yields patterns a human agrees with after light editing.
 - **M3: New** *(done 2026-07-24)*: scaffold a project from a pattern (layout, configs, templates with variable substitution, base-manifest generation, git init). Adds the `commands` facet (canonical dev verbs, written into the scaffolded manifest/taskfile) and the `license` facet (SPDX id; new stamps LICENSE + the manifest field). **Acceptance:** extract from a real repo → `dolly new` → the fresh project passes its own pattern's `check` and its linter, and runs its canonical commands.
@@ -110,7 +111,7 @@ dolly learn [pattern] [--once] [--yes] # watch a project, review drafted pattern
 | Risk | Mitigation |
 |---|---|
 | Refit deletes/moves the wrong thing | Dry-run by default, git-clean requirement, checkpoint branch (M6) |
-| "dolly" name taken on npm/registries | Bin stays `dolly`; publish under a scope if needed; check before M9 |
+| "dolly" name taken on npm/registries | Decided 2026-09-01: the npm package is `dollysheep` (`@dollysheep/core` for the engine), the bin stays `dolly`, and the Homebrew formula is `dolly` (free) |
 | API keys leaking | OS keychain only, never config files; keys never enter patterns or exports |
 | Scope creep | Facet-by-facet discipline; every milestone has acceptance criteria |
 | bun-compiled binaries vs native deps | Prefer pure-TS/WASM deps (e.g. web-tree-sitter if ASTs are ever needed) |
@@ -276,3 +277,7 @@ Two defects came out of the live half. Verification ran the pattern's commands t
 ### 2026-09-01: the pre-public sweep, and the loop that found what the specs could not
 
 The maintainer asked for the rounds before anything goes public: does everything work, is it intuitive, does it hold to open-source standards, does it carry the features a tool like this is expected to, and are they the best version of themselves. The decisions up front, asked and answered before a line was read: defects fixed with tests, product calls reported for the maintainer to pick from, one context reading the whole tree instead of a fan-out, no live model calls, and the web consulted for the competitor bar and the registry names. The read covered every source file, the eight design docs and the five ADRs, the tests by name, and the hygiene files; the live half rebuilt the webview, compiled the binary, walked every verb on four repositories (hyperfine, fzf, click, and dolly itself), drove the daemon and the GUI in a browser, and added one loop no earlier review had run: extract a real repository, then check that same repository against the pattern it just produced. A fresh pattern must describe the tree it came from, which makes that loop the strongest correctness test the engine has, and it failed on all four. dolly's own tree drew seventy false naming violations: ten PascalCase Vue components carried the files vote while ninety single-word modules abstained, and check judges every name. The vote now requires the winner to cover the abstainers as well, and says why when it cannot. The languages rule flagged every lone Dockerfile, Makefile, and helper script as a second language, files the extractor itself had called traces; the rule now judges with the extractor's own bar through one shared classification, and a scaffold carrying a Dockerfile passes its own check again. A dual-licensed crate's LICENSE-MIT and LICENSE-APACHE were not license files. A pattern naming a release tool made every scaffold fail its own check, since the tool's config was never written; it is captured like a hook manager's now, so new writes it and the config rule owns it. pytest's test_ prefix is idiom like Go's _test suffix, and an extension too small for its own override whose every name dissents gets a note naming the entry that settles it. The smaller fixes: dashes in extraction notes, a dead helper in the settings view (vue-tsc flags unused locals from here on), license fields in the four manifests, the Playwright directory ignored, and the stale sentences in gui.md, exports.md, and the README that still described the shell and the bundle export as still to come. Six tests joined, and the gate is green: Biome, tsc, vue-tsc, the webview build, 263 tests with the 8 Linux keychain skips. After the fixes hyperfine and dolly check clean against their fresh patterns, the fzf scaffold is clean, and what remains on fzf and click is the 80% design doing its job (kebab-case shell scripts under a snake_case Go vote, PascalCase pytest subjects), which extract now announces. The product calls went to the maintainer as a report rather than into the code: the npm name (`dolly` and `dolly-cli` are taken, `dolly-patterns` and `dollysheep` are free, Homebrew is free), a CI run on Windows before going public (the matrix has never run, and fit's verification uses `sh -c`), a marker for existing projects, per-project exemptions so a known violation cannot fail CI forever, `check --json`, a pre-commit hook definition, import from a URL, and the conventions panel rendering its markdown. Next: the maintainer's picks from that report, then the release checklist.
+
+### 2026-09-01, later: the calls land, and the private push
+
+The maintainer answered the report the same day: `dollysheep` on npm (`@dollysheep/core` for the engine, `@dollysheep/desktop` for the GUI), with the command and the Homebrew formula staying `dolly`, and every recommendation taken. All but the conventions board are code now. `dolly link <pattern>` writes the `.dolly` marker into an existing project, keeping an ignore list already there, and `fit --apply` adds the marker as a create step when it is missing, so a fitted project resolves its pattern by itself from then on; the daemon has it as `POST /api/link`. The marker is real YAML now, validated, and carries `ignore:`, relative paths with `*` and `**` that every rule honors: an ignored violation is neither reported nor fixed, fit never plans for it, and the report says how many it set aside, so a mandated exception cannot fail CI forever; a marker that does not parse is a diagnostic. `dolly check --json` prints the report in the daemon's wire shape, which moved into one module the CLI and the daemon share, one line per report under `--watch`. `dolly import` takes an https URL under the same size caps as a file. A `.pre-commit-hooks.yaml` sits at the root and the README says how check fits a pipeline. Seven tests joined; 270 run green. The maintainer also asked what else dolly should carry and chose all four proposals for the next stretch: more ecosystems (Ruby, Java and Kotlin, PHP, .NET), multi-repo extract, merge previews in fit, and shell completions. Next: the private push and the three-OS matrix, the conventions board on the canvas, then those four in that order.

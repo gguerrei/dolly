@@ -1,0 +1,16 @@
+# Runs `dolly check` before every commit. In a project's .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/gguerrei/dolly
+#     rev: v0.1.0
+#     hooks:
+#       - id: dolly-check
+#
+# The hook runs the `dolly` on your PATH (language: system), so install it
+# first; the project's .dolly marker names the pattern to check against.
+- id: dolly-check
+  name: dolly check
+  description: Check the project against its dolly pattern; the .dolly marker names it.
+  entry: dolly check
+  language: system
+  pass_filenames: false
+  always_run: true

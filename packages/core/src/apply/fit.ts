@@ -4,9 +4,11 @@ import { checkProject } from "../check/check";
 import { applyFix, type FixPlan, losingCreates } from "../check/fix";
 import type { Violation } from "../check/rule";
 import { nameRegex } from "../check/rules/layout";
+import { existsOnDisk } from "../check/support";
 import { primaryExtensionOf } from "../extract/languages";
 import { extensionOf, renderStem } from "../extract/naming";
 import { filePatternOf, placementOf, TEST_ROOT_NAMES, testStemOf } from "../extract/testing";
+import { MARKER_FILE, markerContents } from "../marker";
 import type { CaseStyle, Pattern } from "../pattern/schema";
 import { slugify } from "../pattern/schema";
 import type { PatternStore } from "../store";
@@ -203,6 +205,17 @@ export async function fitProject(
       continue;
     }
     declined.push({ path: violation.path, message: violation.message });
+  }
+
+  // A project without a marker gets one, so the next check and fit resolve
+  // the pattern by themselves; a marker already there, valid or not, is left.
+  if (!(await existsOnDisk(root, MARKER_FILE))) {
+    steps.push({
+      kind: "fix",
+      path: MARKER_FILE,
+      reason: "links the project to its pattern, so check and fit resolve it without a name",
+      plan: { kind: "create", path: MARKER_FILE, contents: markerContents(patternName) },
+    });
   }
 
   // Ground rule 4, enforced for real: the import ledger reads TS/JS-family

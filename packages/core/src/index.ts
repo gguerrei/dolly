@@ -1,5 +1,5 @@
 /**
- * The deliberate public surface of @dolly/core: the contract the CLI (and
+ * The deliberate public surface of @dollysheep/core: the contract the CLI (and
  * later the daemon and GUI) binds to. One entry point per verb; everything
  * not named here is internal and free to move. Tests reach past this barrel
  * on purpose.
@@ -69,7 +69,14 @@ export {
   UnsafePatternPathError,
   watchLearning,
 } from "./learn/learn";
-export { MARKER_FILE, readPatternMarker } from "./marker";
+export {
+  linkProject,
+  MARKER_FILE,
+  type Marker,
+  MarkerError,
+  readMarker,
+  readPatternMarker,
+} from "./marker";
 // Pattern model
 export {
   type PatternDocument,

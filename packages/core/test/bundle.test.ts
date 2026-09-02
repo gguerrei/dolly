@@ -138,6 +138,30 @@ describe("bundles", () => {
     },
   );
 
+  test("import from a URL goes through the same gates as a file", async () => {
+    const zip = zipSync({ "pattern.md": strToU8(SAMPLE) });
+    const server = Bun.serve({
+      port: 0,
+      fetch: (request) =>
+        new URL(request.url).pathname === "/tidy.dolly"
+          ? new Response(zip)
+          : new Response("no such bundle", { status: 404 }),
+    });
+    try {
+      const store = await freshStore();
+      const base = `http://127.0.0.1:${server.port}`;
+      const pattern = await importBundle(store, `${base}/tidy.dolly`);
+      expect(pattern.name).toBe("tidy-python");
+      expect(await store.has("tidy-python")).toBe(true);
+      await expect(importBundle(store, `${base}/missing.dolly`)).rejects.toThrow(
+        InvalidBundleError,
+      );
+      await expect(importBundle(store, `${base}/missing.dolly`)).rejects.toThrow("HTTP 404");
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("import refuses to overwrite unless forced, and force fully replaces", async () => {
     const source = await freshStore();
     const target = await freshStore();

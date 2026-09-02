@@ -22,6 +22,7 @@ import {
   gitStateOf,
   importBundle,
   learnDrift,
+  linkProject,
   type PatternDocument,
   PatternExistsError,
   PatternNotFoundError,
@@ -40,10 +41,11 @@ import {
   useAi,
   watchLearning,
   watchProject,
-} from "@dolly/core";
+} from "@dollysheep/core";
 import { Command } from "commander";
 import pkg from "../package.json";
 import { DEFAULT_PORT, serveDolly } from "./serve";
+import { checkView } from "./views";
 
 const program = new Command("dolly")
   .description("Save your project's organization patterns. Apply them anywhere.")
@@ -102,11 +104,12 @@ program
   .option("-C, --dir <dir>", "project directory to check", ".")
   .option("--fix", "apply safe autofixes (create, append, merge, never delete)")
   .option("--watch", "re-run whenever the project changes")
+  .option("--json", "print the report as JSON (one line per report under --watch)")
   .description("Check a project against its pattern.")
   .action(
     async (
       patternArg: string | undefined,
-      options: { dir: string; fix?: boolean; watch?: boolean },
+      options: { dir: string; fix?: boolean; watch?: boolean; json?: boolean },
     ) => {
       if (options.fix && options.watch) {
         throw new Error(
@@ -120,9 +123,13 @@ program
           "No pattern named and no .dolly marker here. Run `dolly check <pattern>` (dolly new writes the marker for you).",
         );
       }
+      const print = (report: CheckReport) =>
+        options.json
+          ? console.log(JSON.stringify(checkView(name, report)))
+          : printCheckReport(name, report);
       if (!options.watch) {
         const report = await checkProject(store, name, options.dir, { fix: options.fix });
-        printCheckReport(name, report);
+        print(report);
         if (report.violations.length > 0) process.exitCode = 1;
         return;
       }
@@ -133,12 +140,10 @@ program
         name,
         options.dir,
         (report) => {
-          if (!first) console.log("");
-          printCheckReport(name, report);
-          if (first) {
-            console.log("\nWatching for changes (ctrl-c to stop).");
-            first = false;
-          }
+          if (!first && !options.json) console.log("");
+          print(report);
+          if (first && !options.json) console.log("\nWatching for changes (ctrl-c to stop).");
+          first = false;
         },
         (error) => {
           console.error(error instanceof Error ? error.message : String(error));
@@ -194,6 +199,20 @@ program
     if (result.committed) {
       console.log(`Committed on the current branch. \`git switch ${result.checkpoint}\` reverts.`);
     }
+  });
+
+program
+  .command("link")
+  .argument("<pattern>", "pattern to link the project to")
+  .option("-C, --dir <dir>", "project directory to link", ".")
+  .description("Write the .dolly marker, so check and fit resolve the pattern without a name.")
+  .action(async (pattern: string, options: { dir: string }) => {
+    const store = new PatternStore();
+    if (!(await store.has(pattern))) throw new PatternNotFoundError(pattern);
+    const { replaced } = await linkProject(options.dir, pattern);
+    console.log(
+      `Linked ${options.dir} to "${pattern}"${replaced ? ` (it was linked to "${replaced}")` : ""}. Commit .dolly so the whole team checks against the same pattern.`,
+    );
   });
 
 program
@@ -362,11 +381,11 @@ program
 
 program
   .command("import")
-  .argument("<file>", ".dolly bundle to import")
+  .argument("<source>", ".dolly bundle to import: a file path, or an https URL")
   .option("-f, --force", "replace an existing pattern with the same name")
   .description("Add a shared .dolly bundle to your patterns.")
-  .action(async (file: string, options: { force?: boolean }) => {
-    const pattern = await importBundle(new PatternStore(), file, { force: options.force });
+  .action(async (source: string, options: { force?: boolean }) => {
+    const pattern = await importBundle(new PatternStore(), source, { force: options.force });
     const description = pattern.description ? `: ${pattern.description}` : "";
     console.log(`Imported "${pattern.name}"${description}`);
   });
@@ -564,8 +583,12 @@ function printCheckReport(name: string, report: CheckReport): void {
     console.log(`Pattern issues (fix the pattern, not the project):`);
     for (const line of report.diagnostics) console.log(`  ${line}`);
   }
+  const ignored =
+    report.ignored > 0
+      ? ` (${report.ignored} violation${report.ignored === 1 ? "" : "s"} ignored by .dolly)`
+      : "";
   if (report.violations.length === 0) {
-    console.log(`Clean: this project follows "${name}".`);
+    console.log(`Clean: this project follows "${name}"${ignored}.`);
     return;
   }
   if (report.fixed.length > 0 || report.diagnostics.length > 0) console.log("");
@@ -575,7 +598,7 @@ function printCheckReport(name: string, report: CheckReport): void {
   const fixable = report.violations.filter((v) => v.fix).length;
   const plural = report.violations.length === 1 ? "" : "s";
   console.log(
-    `\n${report.violations.length} violation${plural}${fixable > 0 ? ` (${fixable} fixable; run \`dolly check --fix\`)` : ""}.`,
+    `\n${report.violations.length} violation${plural}${fixable > 0 ? ` (${fixable} fixable; run \`dolly check --fix\`)` : ""}${ignored}.`,
   );
 }
 
