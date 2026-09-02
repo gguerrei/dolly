@@ -103,8 +103,10 @@ view and every saved pattern) over the content. Seven views behind a hash
   picked or typed, then the scaffold report with its next steps); Export
   leads to the export view. Below, an *Overview* of the facets as a two-column grid of panels
   (project, with the two history facets as one line each; toolchain with
-  its captured configs, commands, conventions; layout with its required
-  badges, naming, testing, dependencies), and a
+  its captured configs, commands, the conventions rendered from their
+  markdown since 2026-09-01, headings in the panel's own vocabulary and
+  bullets as a list, folding past three notes behind Show all; layout
+  with its required badges, naming, testing, dependencies), and a
   *Source* mode over the raw `pattern.md` with the CLI's validate-on-save
   loop: a 422 shows the parse error inline and keeps editing, never losing
   the buffer.
@@ -121,7 +123,9 @@ view and every saved pattern) over the content. Seven views behind a hash
   problem.
 - **Fit**: the same directory (shared with Check via `localStorage`),
   then Plan: moves with their import rewrites as subordinate lines, fixes
-  with their plan kind, each move wearing the rule that asked for it,
+  with their plan kind and, since 2026-09-01, the patch each would make as
+  a diff under its row (a dozen lines, then Show all), each move wearing
+  the rule that asked for it,
   translations with their target language and what
   would go to the model under Apply, and a "left to you" group for
   everything fit declined, each with its reason. After an apply, the
@@ -183,7 +187,7 @@ blocks and misreads template usage as dead code; `vue-tsc` owns them.
 
 Every surface starts on a Claude Design canvas and is approved there before it is ported (PLAN, "How visual work happens"). The canvases so far:
 
-- Brand sheet, logo directions, the four app views of the 2026-08-21 redesign, the Learn page (the learn view watching with proposals, and idle; approved and ported 2026-08-21), the Settings page (the AI surface on and off; approved and ported 2026-08-22), the Fit board's translations panel (ported 2026-08-22 to close M7, on the canvas for a look), the Export page (the view after a save, and the view when the file already exists; approved and ported 2026-08-22), and the Flows page (the library extracting a project and importing a bundle, the pattern view scaffolding a new project; designed and ported 2026-08-23, on the canvas for a look): https://claude.ai/code/artifact/e8dce8d4-0b47-4b5f-9d23-a67c9eeb6474
+- Brand sheet, logo directions, the four app views of the 2026-08-21 redesign, the Learn page (the learn view watching with proposals, and idle; approved and ported 2026-08-21), the Settings page (the AI surface on and off; approved and ported 2026-08-22), the Fit board's translations panel (ported 2026-08-22 to close M7, on the canvas for a look), the Export page (the view after a save, and the view when the file already exists; approved and ported 2026-08-22), the Flows page (the library extracting a project and importing a bundle, the pattern view scaffolding a new project; designed and ported 2026-08-23, on the canvas for a look), and the Conventions and Previews pages (the pattern view rendering its markdown, the fit view showing each fix's patch; approved and ported 2026-09-01): https://claude.ai/code/artifact/e8dce8d4-0b47-4b5f-9d23-a67c9eeb6474
 
 The boards are also kept in the repo under [docs/design/canvas/](canvas/README.md), one `.dc.html` per board plus the `canvas.json` that places them, so a session without the artifact can still read the briefs and re-seed the canvas from here.
 

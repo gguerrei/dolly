@@ -219,6 +219,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the command tree, so it cannot drift from it; pattern names
   complete live from `dolly list`, and directory arguments as
   directories. The script's header says where to install it.
+- The pattern view renders the conventions from their markdown (headings
+  in the panel's own vocabulary, bullets as a list, code spans as chips,
+  links to http(s) only, everything else escaped), folding past three
+  notes behind Show all; the fit view shows each fix's patch as a diff
+  under its row, a dozen lines and then Show all. Both boards were
+  approved on the canvas first.
 
 ### Changed
 
