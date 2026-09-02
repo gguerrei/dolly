@@ -315,6 +315,65 @@ describe("dolly CLI", () => {
     expect(settled.stdout).toContain("Nothing to fit");
   });
 
+  test("fit prints each fix's patch under its line", async () => {
+    await seedPattern(
+      "scripted",
+      [
+        "---",
+        "name: scripted",
+        "languages:",
+        "  programming:",
+        "    - TypeScript",
+        "commands:",
+        "  test: bun test",
+        "---",
+      ].join("\n"),
+    );
+    const project = join(home, "scripted");
+    await mkdir(project, { recursive: true });
+    await writeFile(join(project, ".dolly"), "pattern: scripted\n");
+    await writeFile(join(project, "package.json"), '{\n  "name": "x",\n  "scripts": {}\n}\n');
+    const { stdout } = await dolly("fit", "-C", project);
+    expect(stdout).toContain("merge   package.json");
+    expect(stdout).toContain('        +     "test": "bun test"');
+  });
+
+  test("completions render for zsh, bash, and fish, and refuse another shell", async () => {
+    const verbs = [
+      "extract",
+      "new",
+      "check",
+      "fit",
+      "learn",
+      "list",
+      "show",
+      "edit",
+      "delete",
+      "export",
+      "import",
+      "link",
+      "serve",
+      "ai",
+      "home",
+      "completions",
+    ];
+    for (const [shell, marker] of [
+      ["zsh", "#compdef dolly"],
+      ["bash", "complete -F _dolly dolly"],
+      ["fish", "complete -c dolly -f"],
+    ] as const) {
+      const { stdout, exitCode } = await dolly("completions", shell);
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain(marker);
+      for (const verb of verbs) expect(stdout).toContain(verb);
+      expect(stdout).toContain("connect"); // the ai subcommands
+      expect(stdout).toContain("dolly list 2>/dev/null"); // live pattern names
+    }
+    const other = await dolly("completions", "powershell");
+    expect(other.exitCode).toBe(1);
+    expect(other.stderr).toContain("one of: zsh, bash, fish");
+  });
+
   test("learn --once proposes what the project grew, and writes only with --yes", async () => {
     await seedPattern(
       "tidy",

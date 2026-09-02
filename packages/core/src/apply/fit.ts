@@ -1,7 +1,7 @@
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, delimiter, join, resolve } from "node:path";
 import { checkProject } from "../check/check";
-import { applyFix, type FixPlan, losingCreates } from "../check/fix";
+import { applyFix, type FixPlan, losingCreates, previewFix } from "../check/fix";
 import type { Violation } from "../check/rule";
 import { nameRegex } from "../check/rules/layout";
 import { existsOnDisk } from "../check/support";
@@ -37,6 +37,8 @@ export interface FixStep {
   /** check's own message, the reason this step exists. */
   reason: string;
   plan: FixPlan;
+  /** The patch the plan makes, as a unified diff of the file as it stands; the dry run shows it. */
+  preview: string;
 }
 
 export interface MoveStep {
@@ -154,6 +156,7 @@ export async function fitProject(
           path: violation.path,
           reason: violation.message,
           plan: violation.fix,
+          preview: await previewFix(root, violation.fix),
         });
       }
       continue;
@@ -210,11 +213,17 @@ export async function fitProject(
   // A project without a marker gets one, so the next check and fit resolve
   // the pattern by themselves; a marker already there, valid or not, is left.
   if (!(await existsOnDisk(root, MARKER_FILE))) {
+    const plan: FixPlan = {
+      kind: "create",
+      path: MARKER_FILE,
+      contents: markerContents(patternName),
+    };
     steps.push({
       kind: "fix",
       path: MARKER_FILE,
       reason: "links the project to its pattern, so check and fit resolve it without a name",
-      plan: { kind: "create", path: MARKER_FILE, contents: markerContents(patternName) },
+      plan,
+      preview: await previewFix(root, plan),
     });
   }
 
