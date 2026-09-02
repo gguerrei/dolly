@@ -619,7 +619,10 @@ async function verifyTranslations(
       );
       continue;
     }
-    const child = Bun.spawn(["sh", "-c", command], {
+    // The platform's own shell: sh everywhere but Windows, where Git's sh is
+    // rarely on the PATH and cmd resolves the .cmd shims node_modules carries.
+    const shell = process.platform === "win32" ? ["cmd", "/c", command] : ["sh", "-c", command];
+    const child = Bun.spawn(shell, {
       cwd: root,
       env: { ...process.env, PATH: projectPath(root) },
       stdout: "pipe",
@@ -641,7 +644,11 @@ async function verifyTranslations(
 
 /** The project's own bins ahead of the caller's PATH, so `tsc` or `ruff` resolve as they do for its author. */
 function projectPath(root: string): string {
-  const own = [join(root, "node_modules", ".bin"), join(root, ".venv", "bin")];
+  const own = [
+    join(root, "node_modules", ".bin"),
+    join(root, ".venv", "bin"),
+    join(root, ".venv", "Scripts"), // where a Windows virtualenv keeps them
+  ];
   return [...own, process.env.PATH ?? ""].join(delimiter);
 }
 

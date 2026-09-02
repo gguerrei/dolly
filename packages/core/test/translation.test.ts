@@ -48,6 +48,24 @@ async function pythonProject(
   return { store, root };
 }
 
+/** A tool the project installed for itself, the way tsc is: a shell script, or a .cmd shim on Windows. */
+async function installTool(
+  root: string,
+  name: string,
+  exitCode: number,
+  stderr?: string,
+): Promise<void> {
+  const bin = join(root, "node_modules", ".bin");
+  await mkdir(bin, { recursive: true });
+  if (process.platform === "win32") {
+    const lines = [...(stderr ? [`@echo ${stderr} 1>&2`] : []), `@exit /b ${exitCode}`];
+    await writeFile(join(bin, `${name}.cmd`), `${lines.join("\r\n")}\r\n`);
+  } else {
+    const lines = ["#!/bin/sh", ...(stderr ? [`echo '${stderr}' >&2`] : []), `exit ${exitCode}`];
+    await writeFile(join(bin, name), `${lines.join("\n")}\n`, { mode: 0o755 });
+  }
+}
+
 const translations = (plan: { steps: { kind: string }[] }) =>
   plan.steps.filter((s): s is TranslateStep => s.kind === "translate");
 
@@ -199,12 +217,10 @@ describe("translation", () => {
   });
 
   test("apply writes, verifies with the pattern's commands, removes the sources, and commits", async () => {
-    // The typecheck command is a tool the project installed for itself, the way tsc is.
-    const { store, root } = await pythonProject({ typecheck: "own-typecheck", test: "true" });
-    await mkdir(join(root, "node_modules", ".bin"), { recursive: true });
-    await writeFile(join(root, "node_modules", ".bin", "own-typecheck"), "#!/bin/sh\nexit 0\n", {
-      mode: 0o755,
-    });
+    // The commands are tools the project installed for itself, the way tsc is.
+    const { store, root } = await pythonProject({ typecheck: "own-typecheck", test: "own-test" });
+    await installTool(root, "own-typecheck", 0);
+    await installTool(root, "own-test", 0);
     await git(root, "add", "-A");
     await git(root, "commit", "-q", "-m", "own tool");
     await turnOn();
@@ -212,7 +228,7 @@ describe("translation", () => {
     const result = await assistedFitApply(store, "ts-service", root);
     expect(result.failures).toEqual([]);
     expect(result.committed).toBe(true);
-    expect(result.verified).toEqual(["typecheck passed: own-typecheck", "test passed: true"]);
+    expect(result.verified).toEqual(["typecheck passed: own-typecheck", "test passed: own-test"]);
     expect(await readFile(join(root, "src/greet.ts"), "utf8")).toContain("export function greet");
     expect(await Bun.file(join(root, "src/greet.py")).exists()).toBe(false);
     // The second call saw the first translation as house style, and the whole mapping.
@@ -244,9 +260,10 @@ describe("translation", () => {
   });
 
   test("a failing verification keeps every source, commits nothing, and reports the output", async () => {
-    const { store, root } = await pythonProject({
-      typecheck: "echo 'src/main.ts: type error' >&2; exit 2",
-    });
+    const { store, root } = await pythonProject({ typecheck: "own-typecheck" });
+    await installTool(root, "own-typecheck", 2, "src/main.ts: type error");
+    await git(root, "add", "-A");
+    await git(root, "commit", "-q", "-m", "own tool");
     await turnOn();
     stubModel(wellFormed);
     const result = await assistedFitApply(store, "ts-service", root);
