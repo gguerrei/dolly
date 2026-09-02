@@ -143,6 +143,15 @@
       "w": 1440,
       "h": 900,
       "page": "conventions"
+    },
+    {
+      "file": "FitPreview.dc.html",
+      "title": "Fit, with each fix's patch",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "previews"
     }
   ],
   "annotations": [
@@ -201,11 +210,19 @@
       "w": 340,
       "page": "conventions",
       "text": "The conventions panel rendering pattern.md's body instead of showing the raw text: ## headings as panel subheads (uppercase, a rule above), ### headings as bold lines, bullets as a list, code spans as chips, paragraphs that wrap. Long prose folds after the first notes the way the layout list does, with Show all.\n\nEverything else is the Pattern board as it stands, so the two can be compared side by side on the App page. The port renders the body with a small markdown renderer in the webview; Source keeps the raw text for editing."
+    },
+    {
+      "id": "previews-note",
+      "x": 1540,
+      "y": 0,
+      "w": 340,
+      "page": "previews",
+      "text": "Every fix step now carries the patch it would make, and the fit view shows it under the step the way a move shows its import rewrites: a sub-row with the unified diff in the learn view's diff styling, added lines lifted, removed lines dimmed. Long patches would fold past a dozen lines with a Show all, like the layout list.\n\nEverything else is the Fit board as it stands. The engine and the CLI already do this (dolly fit prints the patch under each fix); the view waits on this board."
     }
   ],
   "launch": {
     "view": "canvas",
-    "page": "conventions"
+    "page": "previews"
   },
   "pages": [
     {
@@ -235,6 +252,10 @@
     {
       "id": "conventions",
       "name": "Conventions"
+    },
+    {
+      "id": "previews",
+      "name": "Previews"
     }
   ]
 }

@@ -17,6 +17,7 @@ can be re-seeded from the repo.
 | Export | `Export` (after a save), `ExportExists` |
 | Flows | `LibraryExtract`, `LibraryImport`, `PatternNew` |
 | Conventions | `PatternProse` (the pattern view with its conventions panel rendered from markdown; proposed 2026-09-01, awaiting approval) |
+| Previews | `FitPreview` (the fit view with each fix's patch under its row; proposed 2026-09-01, awaiting approval) |
 
 Each board is a plain HTML fragment inside `<x-dc>`, styled inline in the
 palette of `apps/desktop/src/theme.css`; open one in a browser to see it (the
