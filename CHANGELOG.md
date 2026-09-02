@@ -235,6 +235,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   test fixtures that imitate third-party bytes, which are not dolly's
   words.
 
+- The naming vote covers the names that abstained: a style becomes a facet
+  only when it also holds for the single-word stems that match several
+  styles, since check judges every name. dolly's own repository voted
+  `files: PascalCase` from its Vue components while ninety single-word
+  modules abstained, and check then reported seventy false violations; it
+  now emits no facet and a note that says why. An extension too small for
+  its own override whose every name still fails the files convention is
+  noted too, with the `naming.extensions` entry that settles it, and
+  pytest's `test_` prefix is idiom like Go's `_test` suffix: never a vote,
+  and kept through a rename.
+- The `languages` rule judges with the extractor's own bar: a language the
+  tree carries below two files and one percent of the code bytes (or five
+  files) is a trace, which extract would not have sanctioned either, so a
+  lone Dockerfile, Makefile, or helper script is never reported and never
+  planned for translation. Extract and check read the tree through one
+  classification.
+- A release tool's root config file (`cliff.toml`, `.goreleaser.yml`,
+  `release-please-config.json`, the `.releaserc` family, `.versionrc`,
+  `.cz.toml`) is captured into `toolchain.configs` the way a hook
+  manager's is, so `new` writes it back, the config rule creates it when
+  missing, and the releases rule stands down for a captured one; a
+  scaffold from a pattern that names a tool passes its own check again.
+
 ### Fixed
 
 - The remembered project directory did not show in the check, fit, and
@@ -304,3 +327,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asks for the name on a terminal, as the GUI confirms; a missing captured
   config was reported by two rules; extract counted templates as configs;
   and the export preview demanded a directory even with the pattern named.
+- The pre-public sweep (2026-09-01), run as extract on four real
+  repositories followed by each pattern's own check on its source: a
+  dual-licensed crate's `LICENSE-MIT` and `LICENSE-APACHE` were not
+  license files, so every such repository was told its LICENSE was
+  missing; the root and workspace manifests carry a `license` field now,
+  as dolly's own pattern demands; the settings view's unused
+  environment-variable helper is gone and `vue-tsc` flags unused locals
+  from here on; and the design docs stopped describing the native shell
+  and the bundle export as still to come.

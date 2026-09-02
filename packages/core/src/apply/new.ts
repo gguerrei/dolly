@@ -1,5 +1,6 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import { LICENSE_FILE } from "../extract/license";
 import { extensionOf, renderStem } from "../extract/naming";
 import { type Ecosystem, ecosystemOfPattern, MANIFEST_OF } from "../extract/registry";
 import { TEST_ROOT_NAMES } from "../extract/testing";
@@ -186,8 +187,7 @@ export async function scaffoldProject(
 
   // --- LICENSE stamping ----------------------------------------------------
   const licenseFile =
-    layoutFiles.find((f) => /^(licen[cs]e|copying)($|\.)/i.test(f)) ??
-    (pattern.license ? "LICENSE" : undefined);
+    layoutFiles.find((f) => LICENSE_FILE.test(f)) ?? (pattern.license ? "LICENSE" : undefined);
   if (licenseFile && pattern.license && captured.has(licenseFile)) {
     notes.push(`A captured config already owns ${licenseFile}; the license was not stamped.`);
   } else if (licenseFile && pattern.license) {

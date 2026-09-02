@@ -376,19 +376,22 @@ function namingMove(
 
 /**
  * Renders only the portion of a stem check actually judged: normalizeStem
- * exempts underscore affixes and a `_test`/`_spec` suffix from the vote, so
- * a rename must leave them standing: `my_thing_test` under kebab-case
- * becomes `my-thing_test` (still a test to every tool that greps for one),
- * and `_app` under PascalCase keeps its framework-mandated underscore.
+ * exempts underscore padding, pytest's `test_` prefix, and a `_test`/`_spec`
+ * suffix from the vote, so a rename must leave them standing: `my_thing_test`
+ * under kebab-case becomes `my-thing_test` (still a test to every tool that
+ * greps for one), and `_app` under PascalCase keeps its framework-mandated
+ * underscore.
  */
 function renderJudged(stem: string, style: CaseStyle): string {
-  const lead = stem.match(/^_+/)?.[0] ?? "";
-  const trail = stem.length > lead.length ? (stem.match(/_+$/)?.[0] ?? "") : "";
-  const inner = stem.slice(lead.length, stem.length - trail.length);
+  const prefix = stem.match(/^test_/)?.[0] ?? "";
+  const rest = stem.slice(prefix.length);
+  const lead = rest.match(/^_+/)?.[0] ?? "";
+  const trail = rest.length > lead.length ? (rest.match(/_+$/)?.[0] ?? "") : "";
+  const inner = rest.slice(lead.length, rest.length - trail.length);
   const suffix = inner.match(/_(test|spec)$/)?.[0] ?? "";
   const core = suffix === "" ? inner : inner.slice(0, -suffix.length);
   if (core === "") return stem;
-  return lead + renderStem(core, style) + suffix + trail;
+  return prefix + lead + renderStem(core, style) + suffix + trail;
 }
 
 function testingMove(

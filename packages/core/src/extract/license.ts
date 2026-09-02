@@ -14,11 +14,15 @@ export interface LicenseScan {
   notes: string[];
 }
 
+/**
+ * A license file's name: LICENSE, LICENCE, or COPYING, with any extension, or
+ * with the suffix a dual-licensed crate uses (LICENSE-MIT, LICENSE-APACHE).
+ */
+export const LICENSE_FILE = /^(licen[cs]e|copying)($|[.\-_])/i;
+
 /** The repo's license file, when the inventory can see one at the root. */
 export function findLicenseFile(inventory: Inventory): string | undefined {
-  return inventory.files.find(
-    (f) => !f.path.includes("/") && /^(licen[cs]e|copying)($|\.)/i.test(f.path),
-  )?.path;
+  return inventory.files.find((f) => !f.path.includes("/") && LICENSE_FILE.test(f.path))?.path;
 }
 
 export async function scanLicense(inventory: Inventory): Promise<LicenseScan> {

@@ -7,11 +7,15 @@ import { extensionsOfLanguages } from "./languages";
  * only when it matches exactly one style (`Button` → PascalCase); names
  * matching several styles abstain (`utils`), names matching none count as
  * dissent (`Foo-Bar`). No word segmentation is ever needed at extract time.
+ *
+ * Check judges every name, abstainers included, so a style becomes a facet
+ * only when it also covers the names that abstained: ten PascalCase
+ * components cannot make ninety single-word modules PascalCase.
  */
 export const NAMING_TUNING = {
   /** A pool becomes a facet iff winner ≥ 80% of (votes + dissent)… */
   winRatio: [8, 10] as const,
-  /** …over at least this many distinctive names. */
+  /** …over at least this many distinctive names, and the winner covers 80% of every name judged. */
   minSample: 5,
   /** Report the all-ambiguous case only when it is actually the story. */
   minAmbiguous: 10,
@@ -51,7 +55,10 @@ const MANDATED_EXACT = new Set([
 const MANDATED_STEMS = new Set(["index", "main", "__init__"]);
 
 interface Pool {
+  /** Names matching exactly one style. */
   votes: Map<CaseStyle, number>;
+  /** Names matching several styles, counted toward each style they match. */
+  compatible: Map<CaseStyle, number>;
   ambiguous: number;
   other: number;
 }
@@ -66,7 +73,7 @@ export function scanNaming(inventory: Inventory, languages?: Languages): NamingS
   const byExtension = new Map<string, Pool>();
   const directories = newPool();
   // Naming is a convention about code. With a languages facet in hand, only
-  // its extensions vote — a PascalCase .png or an off-style doc is not
+  // its extensions vote: a PascalCase .png or an off-style doc is not
   // dissent against how the code names itself.
   const allowed = languages?.programming?.length
     ? extensionsOfLanguages(languages.programming)
@@ -109,6 +116,24 @@ export function scanNaming(inventory: Inventory, languages?: Languages): NamingS
     else if (!winner.emit) report(notes, `${extension} files`, pool, winner);
   }
 
+  // An extension too small to vote its own override, whose every name
+  // still fails the files convention (three kebab-case shell scripts in a
+  // snake_case Go repo), is exactly what check will report; say so, and name
+  // the override that settles it.
+  if (facet.files) {
+    for (const [extension, pool] of [...byExtension].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      const decision = decide(pool);
+      if (decision.emit || decision.sample >= NAMING_TUNING.minSample || decision.total === 0)
+        continue;
+      const passing = (pool.votes.get(facet.files) ?? 0) + (pool.compatible.get(facet.files) ?? 0);
+      if (passing > 0) continue;
+      const style = decision.style ? ` (${decision.style} where distinctive)` : "";
+      notes.push(
+        `${decision.total} ${extension} file${decision.total === 1 ? "" : "s"}${style} do not follow the ${facet.files} files convention, so check will report them; add a naming.extensions entry for ${extension} if that is intentional.`,
+      );
+    }
+  }
+
   const dirWinner = decide(directories);
   if (dirWinner.emit) facet.directories = dirWinner.style;
   else report(notes, "Directories", directories, dirWinner);
@@ -118,7 +143,7 @@ export function scanNaming(inventory: Inventory, languages?: Languages): NamingS
 }
 
 function newPool(): Pool {
-  return { votes: new Map(), ambiguous: 0, other: 0 };
+  return { votes: new Map(), compatible: new Map(), ambiguous: 0, other: 0 };
 }
 
 function poolFor(map: Map<string, Pool>, key: string): Pool {
@@ -141,7 +166,7 @@ export function isMandated(path: string, basename: string): boolean {
   return MANDATED_STEMS.has(stem.toLowerCase());
 }
 
-/** The directories that hold code (at any depth) — the ones naming is about. */
+/** The directories that hold code (at any depth), the ones naming is about. */
 export function dirsHoldingCode(inventory: Inventory, allowed: Set<string>): Set<string> {
   const holding = new Set<string>();
   for (const { path } of inventory.files) {
@@ -158,9 +183,16 @@ export function dirsHoldingCode(inventory: Inventory, allowed: Set<string>): Set
   return holding;
 }
 
-/** `__init__` → `init`, `foo_test` → `foo`; test suffixes must not force snake votes. */
+/**
+ * The part of a stem naming judges: `__init__` → `init`, `foo_test` → `foo`,
+ * `test_foo` → `foo`. Test affixes (Go's and pytest's) and underscore
+ * padding are idiom, not case, so they must not force snake votes.
+ */
 export function normalizeStem(stem: string): string {
-  return stem.replace(/^_+|_+$/g, "").replace(/_(test|spec)$/, "");
+  return stem
+    .replace(/^test_/, "")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_(test|spec)$/, "");
 }
 
 export function extensionOf(basename: string): string | undefined {
@@ -174,7 +206,7 @@ export function stylesMatching(stem: string): CaseStyle[] {
 }
 
 /**
- * Renders a stem in a target style — fit's half of the naming contract:
+ * Renders a stem in a target style, fit's half of the naming contract:
  * extract never needs word segmentation, but a rename does. Words split on
  * separators and camel humps, acronym runs staying whole (`HTTPServer` →
  * http, server).
@@ -209,15 +241,22 @@ function castVote(pool: Pool, stem: string): void {
   const matches = stylesMatching(stem);
   if (matches.length === 1) {
     pool.votes.set(matches[0] as CaseStyle, (pool.votes.get(matches[0] as CaseStyle) ?? 0) + 1);
-  } else if (matches.length > 1) pool.ambiguous++;
-  else pool.other++;
+  } else if (matches.length > 1) {
+    pool.ambiguous++;
+    for (const style of matches) pool.compatible.set(style, (pool.compatible.get(style) ?? 0) + 1);
+  } else pool.other++;
 }
 
 interface Decision {
   emit: boolean;
   style?: CaseStyle;
   winnerVotes: number;
+  /** Distinctive names: votes plus dissent. */
   sample: number;
+  /** Every name judged: the sample plus the abstainers. */
+  total: number;
+  /** Names check would pass under the winner. */
+  covered: number;
 }
 
 function decide(pool: Pool): Decision {
@@ -233,22 +272,35 @@ function decide(pool: Pool): Decision {
     }
   }
   const sample = voteTotal + pool.other;
+  const total = sample + pool.ambiguous;
+  const covered = winnerVotes + (style ? (pool.compatible.get(style) ?? 0) : 0);
   const [num, den] = NAMING_TUNING.winRatio;
-  const emit = sample >= NAMING_TUNING.minSample && winnerVotes * den >= sample * num;
-  return { emit, style, winnerVotes, sample };
+  const emit =
+    sample >= NAMING_TUNING.minSample &&
+    winnerVotes * den >= sample * num &&
+    covered * den >= total * num;
+  return { emit, style, winnerVotes, sample, total, covered };
 }
 
 function report(notes: string[], label: string, pool: Pool, decision: Decision): void {
+  const [num, den] = NAMING_TUNING.winRatio;
   if (decision.sample >= NAMING_TUNING.minSample) {
+    if (decision.style && decision.winnerVotes * den >= decision.sample * num) {
+      // The distinctive names agree, but the abstainers would fail check.
+      notes.push(
+        `${label} lean ${decision.style} (${decision.winnerVotes} of ${decision.sample} distinctive names), but ${decision.total - decision.covered} of the ${decision.total} names judged are not ${decision.style} (single lowercase words, for instance); no facet emitted, since check would flag every one of them. Pick a style and add it to the naming facet.`,
+      );
+      return;
+    }
     const parts = STYLES.filter(({ style }) => pool.votes.get(style))
       .map(({ style }) => `${pool.votes.get(style)} ${style}`)
       .concat(pool.other ? [`${pool.other} other`] : []);
     notes.push(
-      `${label} are mixed: ${parts.join(", ")} across ${decision.sample} distinctive names — no ≥80% convention; pick one and add it to the naming facet.`,
+      `${label} are mixed: ${parts.join(", ")} across ${decision.sample} distinctive names, with no ≥80% convention; pick one and add it to the naming facet.`,
     );
   } else if (label === "Files" && pool.ambiguous >= NAMING_TUNING.minAmbiguous) {
     notes.push(
-      `Filenames are mostly single lowercase words (${pool.ambiguous} of them) — kebab-case vs snake_case is indistinguishable from this repo; any consistent choice matches.`,
+      `Filenames are mostly single lowercase words (${pool.ambiguous} of them), so kebab-case and snake_case are indistinguishable in this repo; any consistent choice matches.`,
     );
   }
 }

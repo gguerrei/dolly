@@ -154,7 +154,7 @@ export async function scanDependencies(
         });
       else
         notes.push(
-          `Both ${holders.sort().join(" and ")} are present (purpose: ${purpose}); no facet emitted — keep one and add it by hand.`,
+          `Both ${holders.sort().join(" and ")} are present (purpose: ${purpose}); no facet emitted. Keep one and add it by hand.`,
         );
     }
     return rows;
@@ -173,7 +173,7 @@ export async function scanDependencies(
             ? ` and ${unknown.length - DEPENDENCIES_TUNING.maxListed} more`
             : "";
         notes.push(
-          `Unclassified ${bucket} dependencies (${primary}): ${listed}${more} — add any that are part of your pattern to the dependencies facet with a purpose key.`,
+          `Unclassified ${bucket} dependencies (${primary}): ${listed}${more}. Add any that are part of your pattern to the dependencies facet with a purpose key.`,
         );
       }
     }
@@ -181,7 +181,7 @@ export async function scanDependencies(
       const rows = facetOf(eco2).map((r) => `${r.purpose}: ${r.name}`);
       if (rows.length > 0)
         notes.push(
-          `${name} (secondary ecosystem): ${rows.join(", ")} — promote by hand if wanted (e.g. "${name}/test" keys).`,
+          `${name} (secondary ecosystem): ${rows.join(", ")}. Promote by hand if wanted (e.g. "${name}/test" keys).`,
         );
     }
   }
@@ -364,7 +364,7 @@ async function parsePypi(inventory: Inventory, deps: Dep[], notes: string[]): Pr
         declared = true;
       } else {
         notes.push(
-          `Optional dependency group "${group}" looks like a feature flag, not dev tooling — skipped.`,
+          `Optional dependency group "${group}" looks like a feature flag, not dev tooling, so it was skipped.`,
         );
       }
     }

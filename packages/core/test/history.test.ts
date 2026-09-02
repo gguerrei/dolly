@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { scaffoldProject } from "../src/apply/new";
 import { checkProject } from "../src/check/check";
 import { COMMITS_TUNING, scanCommits } from "../src/extract/commits";
-import { extractPattern } from "../src/extract/extract";
+import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
 import { scanReleases } from "../src/extract/releases";
 import { collectInventory } from "../src/tree/inventory";
 import { cleanupTempRoots, freshStore, repo, seed } from "./support";
@@ -199,6 +199,37 @@ describe("the releases rule", () => {
     expect((await checkProject(store, "released", root)).violations.map((v) => v.path)).toEqual([
       "CHANGELOG.md",
     ]);
+  });
+
+  test("a captured release config gets a create-fix; the releases rule stands down", async () => {
+    // The config rides toolchain.configs the way a hook manager's does.
+    const source = await repo({
+      "cliff.toml": '[changelog]\nheader = "# Changelog"\n',
+      "src/main.rs": "fn main() {}\n",
+      "Cargo.toml": '[package]\nname = "x"\nversion = "0.1.0"\n',
+    });
+    const { document, files } = await extractPattern(source, "cliffed");
+    expect(document.pattern.releases?.tool).toBe("git-cliff");
+    expect(document.pattern.toolchain?.configs["cliff.toml"]).toBe("toolchain/cliff.toml");
+    expect(files["toolchain/cliff.toml"]).toContain("[changelog]");
+
+    const store = await freshStore();
+    await saveExtractedPattern(store, { document, files });
+    const bare = await repo({
+      "src/main.rs": "fn main() {}\n",
+      "Cargo.toml": '[package]\nname = "y"\nversion = "0.1.0"\n',
+    });
+    const before = await checkProject(store, "cliffed", bare);
+    // One violation, the config rule's, with a fix; not the releases rule's shrug on top.
+    expect(before.violations.map((v) => `${v.rule} ${v.path}`)).toEqual(["config cliff.toml"]);
+    expect(before.violations[0]?.fix?.kind).toBe("create");
+    expect((await checkProject(store, "cliffed", bare, { fix: true })).violations).toEqual([]);
+
+    // And a fresh scaffold carries the config, so it passes its own check.
+    const target = join(await repo({}), "fresh");
+    await scaffoldProject(store, "cliffed", target);
+    expect(await Bun.file(join(target, "cliff.toml")).text()).toContain("[changelog]");
+    expect((await checkProject(store, "cliffed", target)).violations).toEqual([]);
   });
 
   test("new stamps the changelog so a fresh project passes its own check", async () => {

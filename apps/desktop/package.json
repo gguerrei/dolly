@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "dolly's GUI: a webview served by `dolly serve`, wrapped by Tauri later.",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

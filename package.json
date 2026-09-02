@@ -2,6 +2,7 @@
   "name": "dolly-monorepo",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "workspaces": [
     "packages/*",
     "apps/*"
