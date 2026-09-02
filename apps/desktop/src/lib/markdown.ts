@@ -11,7 +11,7 @@ const escapeHtml = (text: string): string =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** A private-use character no escaped text can contain marks where each code span goes. */
-const MARK = "";
+const MARK = "\uE000";
 
 /** Code spans first (their contents stay literal), then bold, italic, and links. */
 function inline(text: string): string {
@@ -27,7 +27,7 @@ function inline(text: string): string {
       /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,
       '<a href="$2" rel="noopener noreferrer" target="_blank">$1</a>',
     );
-  return marked.replace(/(\d+)/g, (_, index: string) => spans[Number(index)] as string);
+  return marked.replace(/\uE000(\d+)\uE000/g, (_, index: string) => spans[Number(index)] as string);
 }
 
 export function renderMarkdown(markdown: string): string {
