@@ -78,7 +78,7 @@ A pattern is a **directory**; sharing one means zipping it (`.dolly` bundle).
 ## CLI surface (target)
 
 ```
-dolly extract [path] --name <n>   # infer a pattern from a project      (M2, done)
+dolly extract [paths...] --name <n> # infer a pattern from a project, or what several agree on (M2, done; several 2026-09-01)
 dolly list | show | edit | delete # manage saved patterns               (M0/M1, done)
 dolly new <pattern> [dir]         # scaffold a fresh project            (M3, done)
 dolly check [--fix] [--watch]     # lint-like enforcement               (M4, done)

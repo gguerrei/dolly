@@ -16,6 +16,7 @@ import {
   draftConventions,
   EXPORT_TARGETS,
   exportPattern,
+  extractFromRepos,
   extractPattern,
   type FitPlan,
   facetNames,
@@ -53,13 +54,19 @@ const program = new Command("dolly")
 
 program
   .command("extract")
-  .argument("[path]", "project to learn from", ".")
+  .argument("[paths...]", "project to learn from; several keep what they agree on", ["."])
   .option("-n, --name <name>", "name for the new pattern (default: the directory name)")
   .option("-f, --force", "replace an existing pattern with the same name")
-  .description("Infer a pattern from a real project. No annotations needed.")
-  .action(async (path: string, options: { name?: string; force?: boolean }) => {
+  .description("Infer a pattern from a real project, or from what several agree on.")
+  .action(async (paths: string[], options: { name?: string; force?: boolean }) => {
     const store = new PatternStore();
-    const result = await extractPattern(path, options.name);
+    if (paths.length > 1 && !options.name) {
+      throw new Error("Name the pattern with --name when extracting from several projects.");
+    }
+    const result =
+      paths.length > 1
+        ? await extractFromRepos(paths, options.name as string)
+        : await extractPattern(paths[0] as string, options.name);
     const { pattern } = result.document;
     if ((await store.has(pattern.name)) && !options.force) {
       throw new PatternExistsError(pattern.name);
@@ -70,11 +77,14 @@ program
     const captured = Object.keys(result.files).filter((file) =>
       file.startsWith("toolchain/"),
     ).length;
+    const from = paths.length > 1 ? ` from ${paths.length} projects` : "";
     console.log(
-      `Saved pattern "${pattern.name}" (facets: ${facets || "none"}${captured ? `; ${captured} config${captured === 1 ? "" : "s"} captured` : ""}).`,
+      `Saved pattern "${pattern.name}"${from} (facets: ${facets || "none"}${captured ? `; ${captured} config${captured === 1 ? "" : "s"} captured` : ""}).`,
     );
     console.log(
-      `Review it with \`dolly show ${pattern.name}\`. Extraction notes list what fell short of a facet.`,
+      paths.length > 1
+        ? `Review it with \`dolly show ${pattern.name}\`. The notes say what the projects disagree on, and what each fell short of.`
+        : `Review it with \`dolly show ${pattern.name}\`. Extraction notes list what fell short of a facet.`,
     );
   });
 

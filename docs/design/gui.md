@@ -66,7 +66,7 @@ that does not validate).
 | `POST /api/learn/draft` | `draftConventions` | `{ dir, pattern?, changed, proposals }`: the session's one model call, an empty list with AI off |
 | `GET /api/export?as&pattern` | `renderExport` | the preview: `{ target, path, contents }`, a pure function of the pattern; `as` is one of the text targets, and `dir` stands in for `pattern` when the project's marker should name it |
 | `POST /api/export` | `exportPattern` | `{ dir, pattern?, as, force? }` writes the file at the target's own path under `dir` (409 until `force`); `{ out, pattern, as: "bundle" }` writes the bundle where the native save dialog chose |
-| `POST /api/extract` | `extractPattern` + `saveExtractedPattern` | `{ dir, name?, force? }`: what was saved, the way `dolly extract` says it; an existing name is 409 until `force` |
+| `POST /api/extract` | `extractPattern` or `extractFromRepos` + `saveExtractedPattern` | `{ dir, name?, force? }`, or `{ dirs, name, force? }` to keep what several projects agree on: what was saved, the way `dolly extract` says it; an existing name is 409 until `force` |
 | `POST /api/new` | `scaffoldProject` | `{ pattern, dir }`: the `ScaffoldReport`; a directory that is not empty is 409 |
 | `POST /api/import` | `importBundle` | `{ file, force? }`: the pattern the bundle held, from a path or an https URL; an existing name is 409 until `force`, a file that is not a bundle 400 |
 | `POST /api/link` | `linkProject` | `{ dir, pattern }`: `dolly link` over the wire; the marker written, an ignore list already there kept, and `replaced` naming the pattern the project was linked to before |

@@ -4,6 +4,7 @@ import type { PatternDocument } from "../pattern/document";
 import { type Pattern, slugify } from "../pattern/schema";
 import type { PatternStore } from "../store";
 import { collectInventory, rootFiles } from "../tree/inventory";
+import { agreePatterns } from "./agreement";
 import { scanCommands } from "./commands";
 import { scanCommits } from "./commits";
 import { scanDependencies } from "./dependencies";
@@ -28,7 +29,39 @@ export interface ExtractResult {
   files: Record<string, string>;
 }
 
+/** One repository's extraction with its notes still by section, before the prose is rendered. */
+export interface RepoExtract {
+  /** The repository's own name: its directory's basename. */
+  name: string;
+  result: ExtractResult;
+  sections: [string, string[]][];
+}
+
 export async function extractPattern(repoPath: string, name?: string): Promise<ExtractResult> {
+  return (await extractRepo(repoPath, name)).result;
+}
+
+/**
+ * Several repositories, one pattern: each is extracted on its own, then
+ * the facets they agree on become the pattern (extract/agreement.ts) and
+ * everything left out is named in the notes, with each repository's own
+ * notes after them. The order given breaks ties.
+ */
+export async function extractFromRepos(repoPaths: string[], name: string): Promise<ExtractResult> {
+  const repos: RepoExtract[] = [];
+  for (const path of repoPaths) repos.push(await extractRepo(path));
+  const agreement = agreePatterns(repos, name);
+  const prose = renderProse([
+    ["Agreement", agreement.notes],
+    ...repos.map((repo): [string, string[]] => [
+      `Notes from ${repo.name}`,
+      repo.sections.flatMap(([title, notes]) => notes.map((note) => `${title}: ${note}`)),
+    ]),
+  ]);
+  return { document: { pattern: agreement.pattern, prose }, files: agreement.files };
+}
+
+async function extractRepo(repoPath: string, name?: string): Promise<RepoExtract> {
   const root = resolve(repoPath);
   const inventory = await collectInventory(root);
 
@@ -70,7 +103,7 @@ export async function extractPattern(repoPath: string, name?: string): Promise<E
     ...(releases.releases ? { releases: releases.releases } : {}),
   };
 
-  const prose = renderProse([
+  const sections: [string, string[]][] = [
     ["Layout", layout.notes],
     ["Naming", naming.notes],
     ["Toolchain", toolchain.notes],
@@ -82,11 +115,15 @@ export async function extractPattern(repoPath: string, name?: string): Promise<E
     ["Scaffold", scaffold.notes],
     ["Commits", commits.notes],
     ["Releases", releases.notes],
-  ]);
+  ];
 
   return {
-    document: { pattern, prose },
-    files: { ...toolchain.files, ...scaffold.files },
+    name: basename(root),
+    result: {
+      document: { pattern, prose: renderProse(sections) },
+      files: { ...toolchain.files, ...scaffold.files },
+    },
+    sections,
   };
 }
 

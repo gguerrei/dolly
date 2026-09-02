@@ -261,6 +261,29 @@ Changelog or uses its headings, and a release tool's root fingerprint
 table in `extract/releases.ts`). A changelog in a style dolly does not
 recognize is a note.
 
+## Several repositories (2026-09-01)
+
+`dolly extract a b c --name style` extracts each repository on its own,
+exactly as above, then keeps what they agree on (`extract/agreement.ts`).
+The rule is ADR-0003's three-way degradation applied across trees: a
+facet value becomes the pattern's when a majority of the repositories
+carry it and every one that does says the same thing; a value carried by
+a minority, or one the carriers disagree on, is left out and named in an
+"Agreement" note ("naming.files disagrees: a says kebab-case, c says
+snake_case; left out"), so the author can settle it by hand. Records
+(commands, versions, dependencies by purpose, naming overrides) agree key
+by key; lists (the sanctioned languages, the commit types) keep the
+members a majority carries, dominant first; layout keeps the entries a
+majority carries, required only when every carrier says so, and names
+the minority's paths in one note. A captured config agrees byte for byte
+or, when it is JSON or TOML, keeps only the keys every copy shares,
+reserialized in the formatter's shape, which is exactly what subset
+binding then enforces; a template must match byte for byte. Each
+repository's own notes follow the agreement notes under its name. The
+order the repositories were given breaks ties, and the whole is still a
+pure function of the trees. The daemon takes `dirs` on `POST
+/api/extract` for the same thing.
+
 ## Schema changes (one consolidated diff, format stays 1)
 
 - `naming.extensions`: per-extension case overrides; `files` is the default

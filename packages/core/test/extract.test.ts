@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { checkProject } from "../src/check/check";
-import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
+import { extractFromRepos, extractPattern, saveExtractedPattern } from "../src/extract/extract";
 import { normalizeStem, scanNaming } from "../src/extract/naming";
 import { parsePatternDocument, serializePatternDocument } from "../src/pattern/document";
 import { collectInventory } from "../src/tree/inventory";
@@ -1006,6 +1006,90 @@ describe("extract end to end", () => {
       dev: { mock: "Moq", test: "xunit" },
       versionPolicy: "pinned",
     });
+  });
+
+  test("several repositories yield what they agree on, and the notes say what they do not", async () => {
+    const service = (name: string, extras: Record<string, string>) => ({
+      "package.json": JSON.stringify({
+        name,
+        license: "MIT",
+        engines: { node: ">=22" },
+        scripts: { test: "bun test", lint: "biome check ." },
+        dependencies: { zod: "^4.0.0" },
+        devDependencies: { "@biomejs/biome": "^2.0.0" },
+      }),
+      "bun.lock": "{}",
+      "src/user-service.ts": "export {};\n",
+      "src/order-service.ts": "export {};\n",
+      "src/api-client.ts": "export {};\n",
+      "src/data-store.ts": "export {};\n",
+      "src/event-bus.ts": "export {};\n",
+      "test/user-service.test.ts": "",
+      "test/order-service.test.ts": "",
+      ...extras,
+    });
+    const a = await repo(
+      service("alpha", {
+        "biome.json": JSON.stringify({
+          formatter: { enabled: true, indentWidth: 2 },
+          linter: { enabled: true },
+        }),
+      }),
+    );
+    const b = await repo(
+      service("beta", {
+        "biome.json": JSON.stringify({
+          formatter: { enabled: true, indentWidth: 4 },
+          linter: { enabled: true },
+        }),
+        "docs/guide.md": "# guide\n",
+      }),
+    );
+    const c = await repo({
+      ...service("gamma", {
+        "biome.json": JSON.stringify({
+          formatter: { enabled: true, indentWidth: 2 },
+          linter: { enabled: true },
+        }),
+      }),
+      // gamma names its files in snake_case, so naming cannot agree.
+      "src/user_service.ts": "export {};\n",
+      "src/order_service.ts": "export {};\n",
+      "src/api_client.ts": "export {};\n",
+      "src/data_store.ts": "export {};\n",
+      "src/event_bus.ts": "export {};\n",
+      "src/mail_sender.ts": "export {};\n",
+      "src/rate_limit.ts": "export {};\n",
+    });
+    const { document, files } = await extractFromRepos([a, b, c], "services");
+    const { pattern } = document;
+    expect(pattern.name).toBe("services");
+    expect(pattern.description).toContain("keeping what they agree on");
+    // Unanimous: license, node pin, commands, the validation library, biome.
+    expect(pattern.license).toBe("MIT");
+    expect(pattern.languages?.versions).toEqual({ node: ">=22" });
+    expect(pattern.commands).toEqual({ lint: "biome check .", test: "bun test" });
+    expect(pattern.dependencies?.runtime).toEqual({ validation: "zod" });
+    expect(pattern.toolchain?.formatter).toBe("biome");
+    // biome.json differs on one key: the shared keys are captured, the note says so.
+    expect(JSON.parse(files["toolchain/biome.json"] as string)).toEqual({
+      formatter: { enabled: true },
+      linter: { enabled: true },
+    });
+    expect(document.prose).toContain(
+      "biome.json differs between the repositories; only the keys they all agree on were captured.",
+    );
+    // Naming disagrees (kebab, kebab, mixed): left out, and said.
+    expect(pattern.naming?.files).toBeUndefined();
+    expect(document.prose).toContain("naming.files is set in 2 of 3 repositories");
+    // Layout keeps the majority; docs/ from one repository is named as left out.
+    expect(pattern.layout.map((e) => e.path)).toContain("src/");
+    expect(pattern.layout.map((e) => e.path)).not.toContain("docs/");
+    expect(document.prose).toContain("left out: docs/");
+    // Each repository's own notes follow, under its name.
+    expect(document.prose).toContain("### Notes from");
+    // The result is a pattern like any other: it parses and round-trips.
+    expect(parsePatternDocument(serializePatternDocument(document)).pattern).toEqual(pattern);
   });
 
   test("an empty directory extracts an empty but valid pattern", async () => {

@@ -206,6 +206,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a pattern writes the right manifest, seeds its test runner, and passes
   its own check, and `*_spec.rb`, `*Test.php`, and `*Tests.cs` are test
   shapes the testing facet knows.
+- `dolly extract a b c --name style` learns from several projects at once:
+  each is extracted on its own, a facet is kept when a majority carry it
+  and every carrier agrees, a JSON or TOML config keeps the keys every
+  copy shares, and whatever was left out is named in the notes with each
+  project's own notes after them. The daemon takes `dirs` for the same.
 
 ### Changed
 
