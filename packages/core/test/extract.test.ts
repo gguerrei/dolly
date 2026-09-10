@@ -1180,6 +1180,32 @@ describe("extract end to end", () => {
     expect(parsePatternDocument(serializePatternDocument(document)).pattern).toEqual(pattern);
   });
 
+  test("the sanctioned languages agree on the dominant one, or are left out", async () => {
+    const scripts = { "scripts/run.sh": "#!/bin/sh\n", "scripts/go.sh": "#!/bin/sh\n" };
+    const ts = await repo({
+      "package.json": JSON.stringify({ name: "ts" }),
+      "src/a.ts": "export {};\n",
+      "src/b.ts": "export {};\n",
+      ...scripts,
+    });
+    const py = await repo({
+      "pyproject.toml": '[project]\nname = "py"\n',
+      "src/a.py": "x = 1\n",
+      "src/b.py": "x = 1\n",
+      ...scripts,
+    });
+    const { document } = await extractFromRepos([ts, py], "mixed");
+    // Both carry Shell, but neither writes Shell: no list without a shared dominant language.
+    expect(document.pattern.languages?.programming ?? []).toEqual([]);
+    expect(document.prose).toContain("the dominant language disagrees");
+  });
+
+  test("a path that is not a directory is refused in plain words", async () => {
+    const root = await repo({ "notes.txt": "just a file" });
+    await expect(extractPattern(join(root, "notes.txt"))).rejects.toThrow("is not a directory");
+    await expect(extractPattern(join(root, "missing"))).rejects.toThrow("does not exist");
+  });
+
   test("an empty directory extracts an empty but valid pattern", async () => {
     const root = await repo({ "notes.txt": "just a file" });
     const { document } = await extractPattern(root, "empty-ish");

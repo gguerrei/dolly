@@ -131,8 +131,8 @@ const projectCells = computed<Cell[]>(() => {
 const roleCells = computed<Cell[]>(() =>
   toolRoles.value.map(({ role, tool }) => ({ key: role, value: tool, mono: true })),
 );
-/** Runtime dependencies down the left, dev down the right, as on the board. */
-const dependencyRows = computed<[Cell | undefined, Cell | undefined][]>(() => {
+/** Runtime dependencies down the left, dev down the right, as on the board; one column when only one kind exists. */
+const dependencyRows = computed<(Cell | undefined)[][]>(() => {
   const deps = pattern.value?.dependencies;
   const runtime = Object.entries(deps?.runtime ?? {}).map(
     ([key, value]): Cell => ({ key, value, mono: true }),
@@ -140,7 +140,8 @@ const dependencyRows = computed<[Cell | undefined, Cell | undefined][]>(() => {
   const dev = Object.entries(deps?.dev ?? {}).map(
     ([key, value]): Cell => ({ key, value, mono: true, dev: true }),
   );
-  const rows: [Cell | undefined, Cell | undefined][] = [];
+  if (runtime.length === 0 || dev.length === 0) return [...runtime, ...dev].map((cell) => [cell]);
+  const rows: (Cell | undefined)[][] = [];
   for (let i = 0; i < Math.max(runtime.length, dev.length); i++) rows.push([runtime[i], dev[i]]);
   return rows;
 });
@@ -431,16 +432,16 @@ onMounted(load);
             </div>
             <table class="kv">
               <tbody>
-                <tr v-for="([runtime, dev], index) in dependencyRows" :key="index">
-                  <td class="k">{{ runtime?.key }}</td>
-                  <td><span v-if="runtime" class="mono">{{ runtime.value }}</span></td>
-                  <td class="k">{{ dev?.key }}</td>
-                  <td>
-                    <template v-if="dev">
-                      <span class="mono">{{ dev.value }}</span>
-                      <span class="badge">dev</span>
-                    </template>
-                  </td>
+                <tr v-for="(cells, index) in dependencyRows" :key="index">
+                  <template v-for="(cell, at) in cells" :key="at">
+                    <td class="k">{{ cell?.key }}</td>
+                    <td>
+                      <template v-if="cell">
+                        <span class="mono">{{ cell.value }}</span>
+                        <span v-if="cell.dev" class="badge">dev</span>
+                      </template>
+                    </td>
+                  </template>
                 </tr>
               </tbody>
             </table>

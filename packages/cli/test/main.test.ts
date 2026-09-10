@@ -154,6 +154,16 @@ describe("dolly CLI", () => {
 
     const shown = await dolly("show", "my-widget");
     expect(shown.stdout).toContain("validation: zod");
+
+    // A directory with nothing recognizable still saves, and says so.
+    const bare = join(home, "bare");
+    await mkdir(bare, { recursive: true });
+    const empty = await dolly("extract", bare);
+    expect(empty.exitCode).toBe(0);
+    expect(empty.stdout).toContain("so the pattern has no facets");
+    const file = await dolly("extract", join(project, "README.md"));
+    expect(file.exitCode).toBe(1);
+    expect(file.stderr).toContain("is not a directory");
   });
 
   test("extract from several projects needs a name, and keeps what they agree on", async () => {

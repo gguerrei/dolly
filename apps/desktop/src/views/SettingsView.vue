@@ -215,6 +215,10 @@ onMounted(load);
               <span class="muted">labels a suggestion on the moves it could not decide alone; apply never reads it.</span>
             </span>
             <span>
+              <strong>Fit, under Apply</strong>
+              <span class="muted">has the model rewrite files written outside the pattern's languages, judged by the pattern's own typecheck and test commands before any source is removed.</span>
+            </span>
+            <span>
               <strong>Learn</strong>
               <span class="muted">drafts convention lines from the files that changed, once per session, for you to accept or skip.</span>
             </span>

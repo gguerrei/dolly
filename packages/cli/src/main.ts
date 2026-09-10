@@ -40,6 +40,7 @@ import {
   scaffoldProject,
   serializePatternDocument,
   useAi,
+  verifyAi,
   watchLearning,
   watchProject,
 } from "@dollysheep/core";
@@ -82,6 +83,11 @@ program
     console.log(
       `Saved pattern "${pattern.name}"${from} (facets: ${facets || "none"}${captured ? `; ${captured} config${captured === 1 ? "" : "s"} captured` : ""}).`,
     );
+    if (!facets) {
+      console.log(
+        `Nothing in ${paths.join(", ")} was recognizable as a project, so the pattern has no facets.`,
+      );
+    }
     console.log(
       paths.length > 1
         ? `Review it with \`dolly show ${pattern.name}\`. The notes say what the projects disagree on, and what each fell short of.`
@@ -202,7 +208,10 @@ program
     // With AI on, translate steps are planned and the model fills them in (ADR-0004).
     const result = await assistedFitApply(store, name, options.dir);
     printFitPlan(name, result.plan);
-    console.log(`\nCheckpoint: branch ${result.checkpoint} holds the tree as it was.`);
+    console.log("");
+    if (result.checkpoint) {
+      console.log(`Checkpoint: branch ${result.checkpoint} holds the tree as it was.`);
+    }
     for (const line of result.applied) console.log(`applied  ${line}`);
     for (const line of result.verified) console.log(`verified ${line}`);
     for (const line of result.failures) console.log(`FAILED   ${line}`);
@@ -426,9 +435,18 @@ const ai = program
   .description("The optional AI layer: bring your own key. Off by default, and off is fine.");
 
 ai.command("status", { isDefault: true })
+  .option("--verify", "make one live call, so a revoked key shows here and not inside a consumer")
   .description("Show whether AI is on, with which provider and model.")
-  .action(async () => {
-    printAiStatus(await aiStatus());
+  .action(async (options: { verify?: boolean }) => {
+    if (!options.verify) {
+      printAiStatus(await aiStatus());
+      return;
+    }
+    const { status, error } = await verifyAi();
+    printAiStatus(status);
+    if (!status.provider || status.keySource === "missing") return;
+    console.log(error ? `The key was refused: ${error}` : "The key works: the provider answered.");
+    if (error) process.exitCode = 1;
   });
 
 ai.command("connect")
@@ -529,6 +547,7 @@ function printFitPlan(name: string, plan: FitPlan): void {
           `    ai (${item.suggestion.model}) suggests ${item.suggestion.pick}: ${item.suggestion.why}`,
         );
       }
+      if (item.aiError) console.log(`    ai: ${item.aiError}`);
     }
   }
 }

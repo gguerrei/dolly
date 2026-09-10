@@ -103,6 +103,8 @@ export interface FitReport {
     message: string;
     /** Attached by the AI layer when it is on; a labeled pick, never a step. */
     suggestion?: { pick: string; why: string; model: string };
+    /** Why the AI layer could not suggest, when it tried. */
+    aiError?: string;
   }[];
   diagnostics: string[];
   /** Present after an apply. */
