@@ -55,7 +55,8 @@ export function renderCompletions(program: Command, shell: Shell): string {
 /** One line: the names of the saved patterns, for a live completion. */
 const PATTERN_NAMES = "dolly list 2>/dev/null | awk '{print $1}'";
 
-const q = (text: string) => `'${text.replace(/'/g, "'\\\\''")}'`;
+/** Single-quoted for the shell, an embedded quote closing, escaping, and reopening the string. */
+const q = (text: string) => `'${text.replace(/'/g, "'\\''")}'`;
 
 function zsh(verbs: Verb[]): string {
   const spec = (verb: Verb): string[] => {
@@ -84,7 +85,7 @@ function zsh(verbs: Verb[]): string {
           (sub) =>
             `        ${sub.name}) _arguments ${spec(sub).map(q).join(" ") || "'*::arg:'"} ;;`,
         )
-        .join("\\n");
+        .join("\n");
       const names = verb.subcommands
         .map((s) => q(`${s.name}:${s.description.replace(/:/g, " ")}`))
         .join(" ");
@@ -97,7 +98,7 @@ ${inner}
         *) _arguments '1:subcommand:_dolly_subcommand' ;;
       esac ;;`;
     })
-    .join("\\n");
+    .join("\n");
   const commands = verbs.map((v) => q(`${v.name}:${v.description.replace(/:/g, " ")}`)).join(" ");
   return `#compdef dolly
 # dolly completions for zsh. Install with:
@@ -138,7 +139,7 @@ function bash(verbs: Verb[]): string {
       if [ "$COMP_CWORD" -eq 2 ]; then COMPREPLY=($(compgen -W "${verb.subcommands.map((s) => s.name).join(" ")}" -- "$cur")); return; fi
       case "\${COMP_WORDS[2]}" in ${inner} esac ;;`;
     })
-    .join("\\n");
+    .join("\n");
   return `# dolly completions for bash. Install with:
 #   dolly completions bash > ~/.local/share/bash-completion/completions/dolly
 
@@ -206,5 +207,5 @@ function fish(verbs: Verb[]): string {
       }
     }
   }
-  return `${lines.join("\\n")}\\n`;
+  return `${lines.join("\n")}\n`;
 }

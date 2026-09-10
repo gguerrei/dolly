@@ -368,6 +368,15 @@ describe("dolly CLI", () => {
       for (const verb of verbs) expect(stdout).toContain(verb);
       expect(stdout).toContain("connect"); // the ai subcommands
       expect(stdout).toContain("dolly list 2>/dev/null"); // live pattern names
+      expect(stdout).not.toContain("\\n"); // real newlines, never the two characters
+      // The shell's own parser is the judge, whenever it is on this machine.
+      const parser = Bun.which(shell);
+      if (parser) {
+        const script = join(home, `completions.${shell}`);
+        await writeFile(script, stdout);
+        const parsed = Bun.spawn([parser, "-n", script], { stdout: "pipe", stderr: "pipe" });
+        expect(await parsed.exited).toBe(0);
+      }
     }
     const other = await dolly("completions", "powershell");
     expect(other.exitCode).toBe(1);
