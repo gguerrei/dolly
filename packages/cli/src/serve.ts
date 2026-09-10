@@ -24,18 +24,20 @@ import {
   gitStateOf,
   InvalidBundleError,
   InvalidPatternNameError,
+  ignorePaths,
   importBundle,
   linkProject,
   MarkerError,
   PatternExistsError,
   PatternNotFoundError,
   PatternParseError,
+  type PatternRef,
   PatternStore,
   type Proposal,
   parsePatternDocument,
-  readPatternMarker,
   renderExport,
   renderProposal,
+  resolvePattern,
   saveExtractedPattern,
   saveLearned,
   scaffoldProject,
@@ -209,20 +211,20 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     const body = (await request.json()) as { dir?: string; pattern?: string; fix?: boolean };
     if (!body.dir)
       return json({ error: "`dir` is required: the project directory to check." }, 400);
-    const name = await resolvePattern(body.pattern, body.dir);
-    if (!name) return markerHint();
-    const report = await checkProject(store, name, body.dir, { fix: body.fix });
-    return json(checkView(name, report));
+    const ref = await resolvePattern(store, body.dir, body.pattern);
+    if (!ref) return markerHint();
+    const report = await checkProject(ref.store, ref.name, body.dir, { fix: body.fix });
+    return json(checkView(ref.name, report));
   }
 
   if (path === "/api/fit" && request.method === "POST") {
     const body = (await request.json()) as { dir?: string; pattern?: string; apply?: boolean };
     if (!body.dir) return json({ error: "`dir` is required: the project directory to fit." }, 400);
-    const name = await resolvePattern(body.pattern, body.dir);
-    if (!name) return markerHint();
+    const ref = await resolvePattern(store, body.dir, body.pattern);
+    if (!ref) return markerHint();
     // The plan is data end to end, so it crosses the wire as itself.
     if (body.apply) {
-      const result = await assistedFitApply(store, name, body.dir);
+      const result = await assistedFitApply(ref.store, ref.name, body.dir);
       return json({
         git: "clean",
         ...result.plan,
@@ -234,27 +236,27 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
       });
     }
     // Ambiguous declines carry a labeled AI suggestion when the layer is on.
-    const plan = await assistedFit(store, name, body.dir);
+    const plan = await assistedFit(ref.store, ref.name, body.dir);
     return json({ git: await gitStateOf(body.dir), ...plan });
   }
 
   if (path === "/api/watch" && request.method === "GET") {
     const dir = url.searchParams.get("dir");
     if (!dir) return json({ error: "`dir` is required: the project directory to watch." }, 400);
-    const name = await resolvePattern(url.searchParams.get("pattern") ?? undefined, dir);
-    if (!name) return markerHint();
-    if (!(await store.has(name))) throw new PatternNotFoundError(name);
-    return watchStream(store, name, dir, request);
+    const ref = await resolvePattern(store, dir, url.searchParams.get("pattern") ?? undefined);
+    if (!ref) return markerHint();
+    if (!(await ref.store.has(ref.name))) throw new PatternNotFoundError(ref.name);
+    return watchStream(ref, dir, request);
   }
 
   if (path === "/api/learn" && request.method === "GET") {
     const dir = url.searchParams.get("dir");
     if (!dir)
       return json({ error: "`dir` is required: the project directory to learn from." }, 400);
-    const name = await resolvePattern(url.searchParams.get("pattern") ?? undefined, dir);
-    if (!name) return markerHint();
-    if (!(await store.has(name))) throw new PatternNotFoundError(name);
-    return learnStream(store, name, dir, request);
+    const ref = await resolvePattern(store, dir, url.searchParams.get("pattern") ?? undefined);
+    if (!ref) return markerHint();
+    if (!(await ref.store.has(ref.name))) throw new PatternNotFoundError(ref.name);
+    return learnStream(ref, dir, request);
   }
 
   if (path === "/api/learn" && request.method === "POST") {
@@ -266,11 +268,11 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     };
     if (!body.dir)
       return json({ error: "`dir` is required: the project directory learned from." }, 400);
-    const name = await resolvePattern(body.pattern, body.dir);
-    if (!name) return markerHint();
+    const ref = await resolvePattern(store, body.dir, body.pattern);
+    if (!ref) return markerHint();
     const accepted = body.accepted ?? [];
-    await saveLearned(store, name, accepted); // UnsafePatternPathError → 400, nothing written
-    return json({ pattern: name, written: accepted.length });
+    await saveLearned(ref.store, ref.name, accepted); // UnsafePatternPathError → 400, nothing written
+    return json({ pattern: ref.name, written: accepted.length });
   }
 
   if (path === "/api/learn/draft" && request.method === "POST") {
@@ -283,11 +285,11 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     };
     if (!body.dir)
       return json({ error: "`dir` is required: the project directory learned from." }, 400);
-    const name = await resolvePattern(body.pattern, body.dir);
-    if (!name) return markerHint();
-    const doc = await store.load(name);
+    const ref = await resolvePattern(store, body.dir, body.pattern);
+    if (!ref) return markerHint();
+    const doc = await ref.store.load(ref.name);
     const drafted = await draftConventions(doc, body.dir, body.changed ?? [], body.proposals ?? []);
-    return json(await learnView(store, name, drafted));
+    return json(await learnView(ref, drafted));
   }
 
   if (path === "/api/export" && request.method === "GET") {
@@ -296,10 +298,9 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     const dir = url.searchParams.get("dir");
     const target = textTarget(url.searchParams.get("as"));
     if (!target) return json({ error: targetHint() }, 400);
-    const explicit = url.searchParams.get("pattern") ?? undefined;
-    const name = explicit ?? (dir ? await readPatternMarker(dir) : undefined);
-    if (!name) return markerHint();
-    return json({ pattern: name, ...renderExport(await store.load(name), target) });
+    const ref = await patternOrMarker(store, url.searchParams.get("pattern") ?? undefined, dir);
+    if (!ref) return markerHint();
+    return json({ pattern: ref.name, ...renderExport(await ref.store.load(ref.name), target) });
   }
 
   if (path === "/api/export" && request.method === "POST") {
@@ -318,15 +319,19 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
     }
     if (!target)
       return json({ error: `\`as\` must be one of: ${EXPORT_TARGETS.join(", ")}.` }, 400);
-    const name = body.pattern ?? (body.dir ? await readPatternMarker(body.dir) : undefined);
-    if (!name) return markerHint();
+    const ref = await patternOrMarker(store, body.pattern, body.dir);
+    if (!ref) return markerHint();
     const out =
       body.out ??
       join(
         resolve(body.dir as string),
-        target === "bundle" ? `${name}.dolly` : renderExport(await store.load(name), target).path,
+        target === "bundle"
+          ? `${ref.name}.dolly`
+          : renderExport(await ref.store.load(ref.name), target).path,
       );
-    return json({ path: await exportPattern(store, name, target, { out, force: body.force }) });
+    return json({
+      path: await exportPattern(ref.store, ref.name, target, { out, force: body.force }),
+    });
   }
 
   // The three flows the native shell's pickers unlocked (M9). Each binds the
@@ -368,12 +373,24 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
   }
 
   if (path === "/api/link" && request.method === "POST") {
-    // `dolly link`: the marker written, the ignore list a marker already there carries kept.
-    const body = (await request.json()) as { dir?: string; pattern?: string };
+    // `dolly link`: the marker written, the ignore list and rules a marker
+    // already there carries kept, the pattern copied into the project with `vendor`.
+    const body = (await request.json()) as { dir?: string; pattern?: string; vendor?: boolean };
     if (!body.dir) return json({ error: "`dir` is required: the project directory to link." }, 400);
     if (!body.pattern) return json({ error: "`pattern` is required." }, 400);
     if (!(await store.has(body.pattern))) throw new PatternNotFoundError(body.pattern);
-    return json({ pattern: body.pattern, ...(await linkProject(body.dir, body.pattern)) });
+    const linked = await linkProject(body.dir, body.pattern, {
+      ...(body.vendor ? { vendorFrom: store } : {}),
+    });
+    return json({ pattern: body.pattern, ...linked });
+  }
+
+  if (path === "/api/ignore" && request.method === "POST") {
+    // `dolly ignore`: paths added to the marker's ignore list, the marker returned whole.
+    const body = (await request.json()) as { dir?: string; paths?: string[] };
+    if (!body.dir) return json({ error: "`dir` is required: the project directory." }, 400);
+    if (!body.paths?.length) return json({ error: "`paths` is required: what to ignore." }, 400);
+    return json(await ignorePaths(body.dir, body.paths));
   }
 
   if (path === "/api/import" && request.method === "POST") {
@@ -434,12 +451,14 @@ async function readPatternSource(store: PatternStore, name: string): Promise<str
   }
 }
 
-/** The CLI's resolution order: an explicit name beats the marker, the marker beats nothing. */
-async function resolvePattern(
+/** An explicit name reads the store; otherwise the directory's marker decides, when there is a directory. */
+async function patternOrMarker(
+  store: PatternStore,
   explicit: string | undefined,
-  dir: string,
-): Promise<string | undefined> {
-  return explicit ?? readPatternMarker(dir);
+  dir: string | null | undefined,
+): Promise<PatternRef | undefined> {
+  if (explicit) return { store, name: explicit };
+  return dir ? resolvePattern(store, dir) : undefined;
 }
 
 function markerHint(): Response {
@@ -451,8 +470,7 @@ function markerHint(): Response {
 
 /** The wire shape of a proposal: the data, plus the diff the GUI shows for it. */
 async function learnView(
-  store: PatternStore,
-  name: string,
+  { store, name }: PatternRef,
   proposals: Proposal[],
 ): Promise<(Proposal & { diff: string })[]> {
   const doc = await store.load(name);
@@ -468,7 +486,8 @@ async function learnView(
  * One JSON line per re-learn: the proposals and the files changed so far.
  * The watcher stops when the client goes away.
  */
-function learnStream(store: PatternStore, name: string, dir: string, request: Request): Response {
+function learnStream(ref: PatternRef, dir: string, request: Request): Response {
+  const { store, name } = ref;
   const encoder = new TextEncoder();
   let stop = (): void => {};
   const stream = new ReadableStream<Uint8Array>({
@@ -485,7 +504,7 @@ function learnStream(store: PatternStore, name: string, dir: string, request: Re
         name,
         dir,
         (proposals) =>
-          learnView(store, name, proposals).then(
+          learnView(ref, proposals).then(
             (view) => send({ pattern: name, proposals: view, changed: watcher.changed() }),
             (error) => send({ error: error instanceof Error ? error.message : String(error) }),
           ),
@@ -504,7 +523,7 @@ function learnStream(store: PatternStore, name: string, dir: string, request: Re
 }
 
 /** One JSON report per line, `watchProject` disposed when the client goes away. */
-function watchStream(store: PatternStore, name: string, dir: string, request: Request): Response {
+function watchStream({ store, name }: PatternRef, dir: string, request: Request): Response {
   const encoder = new TextEncoder();
   let dispose = (): void => {};
   const stream = new ReadableStream<Uint8Array>({

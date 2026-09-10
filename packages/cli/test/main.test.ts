@@ -265,6 +265,31 @@ describe("dolly CLI", () => {
     const missing = await dolly("link", "nope", "-C", project);
     expect(missing.exitCode).toBe(1);
     expect(missing.stderr).toContain('No saved pattern named "nope"');
+
+    // --vendor copies the pattern into the project and points the marker at it.
+    const vendored = await dolly("link", "tidy", "-C", project, "--vendor");
+    expect(vendored.exitCode).toBe(0);
+    expect(vendored.stdout).toContain("dolly/tidy/");
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe(
+      "pattern: tidy\nsource: dolly\nignore:\n  - legacy/\n",
+    );
+    expect(await readFile(join(project, "dolly", "tidy", "pattern.md"), "utf8")).toContain(
+      "name: tidy",
+    );
+    // A machine with nothing in its store still checks: the checkout carries the pattern.
+    const elsewhere = await dollyWithEnv(
+      { DOLLY_HOME: join(home, "elsewhere") },
+      "check",
+      "-C",
+      project,
+    );
+    expect(elsewhere.exitCode).toBe(0);
+    expect(elsewhere.stdout).toContain('follows "tidy"');
+    // dolly ignore appends to the marker's list.
+    const ignored = await dolly("ignore", "shell/*.fish", "-C", project);
+    expect(ignored.exitCode).toBe(0);
+    expect(ignored.stdout).toContain("Ignoring 2 paths");
+    expect(await readFile(join(project, ".dolly"), "utf8")).toContain("  - shell/*.fish\n");
   });
 
   test("check --json prints the daemon's wire shape, the ignored count included", async () => {

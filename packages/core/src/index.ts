@@ -40,9 +40,15 @@ export {
   type Translator,
 } from "./apply/fit";
 export { type ScaffoldReport, scaffoldProject, TargetNotEmptyError } from "./apply/new";
-export { type CheckReport, checkProject, watchProject } from "./check/check";
+export {
+  type CheckReport,
+  type ConventionFinding,
+  type ConventionsReport,
+  checkProject,
+  watchProject,
+} from "./check/check";
 export type { FixPlan } from "./check/fix";
-export type { RuleId, Violation } from "./check/rule";
+export { RULE_IDS, type RuleId, type Violation } from "./check/rule";
 export {
   exportBundle,
   InvalidBundleError,
@@ -76,12 +82,17 @@ export {
   watchLearning,
 } from "./learn/learn";
 export {
+  ignorePaths,
   linkProject,
   MARKER_FILE,
   type Marker,
   MarkerError,
+  type PatternRef,
+  type RuleSetting,
   readMarker,
   readPatternMarker,
+  resolvePattern,
+  VENDOR_DIR,
 } from "./marker";
 // Pattern model
 export {

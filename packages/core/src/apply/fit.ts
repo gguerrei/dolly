@@ -206,7 +206,7 @@ export async function fitProject(
     const plan: FixPlan = {
       kind: "create",
       path: MARKER_FILE,
-      contents: markerContents(patternName),
+      contents: markerContents({ pattern: patternName }),
     };
     steps.push({
       kind: "fix",

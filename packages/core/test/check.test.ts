@@ -1,10 +1,17 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { scaffoldProject } from "../src/apply/new";
 import { checkProject } from "../src/check/check";
+import { exportBundle } from "../src/export/bundle";
 import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
-import { readPatternMarker } from "../src/marker";
+import {
+  ignorePaths,
+  linkProject,
+  type PatternRef,
+  readPatternMarker,
+  resolvePattern,
+} from "../src/marker";
 import { cleanupTempRoots, freshStore, repo, seed, tempDir } from "./support";
 
 afterAll(cleanupTempRoots);
@@ -598,6 +605,85 @@ describe("checkProject", () => {
       "docs/BadDoc.md",
       "src/BadFile.ts",
     ]);
+  });
+
+  test("the marker's rules turn a rule off (counted) or down to a warning", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "strict",
+      naming: { files: "snake_case" },
+      layout: [{ path: "docs/", required: true }],
+    });
+    const project = await repo({
+      ".dolly": "pattern: strict\nrules:\n  naming: off\n  layout: warn\n",
+      "src/BadName.py": "",
+    });
+    const report = await checkProject(store, "strict", project);
+    expect(report.violations.map((v) => `${v.rule} ${v.path} ${v.severity ?? "error"}`)).toEqual([
+      "layout docs/ warning",
+    ]);
+    expect(report.ignored).toBe(1);
+    const bad = await repo({ ".dolly": "pattern: strict\nrules:\n  naming: loud\n" });
+    expect((await checkProject(store, "strict", bad)).diagnostics.join("\n")).toContain(
+      "not a valid marker",
+    );
+  });
+
+  test("a vendored pattern resolves from the project itself, store or no store", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "tidy", layout: [{ path: "docs/", required: true }] });
+    const project = await repo({ "docs/index.md": "# docs\n" });
+    const { vendored } = await linkProject(project, "tidy", { vendorFrom: store });
+    expect(vendored).toBe("dolly/tidy");
+    expect(await Bun.file(join(project, "dolly/tidy/pattern.md")).exists()).toBe(true);
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe("pattern: tidy\nsource: dolly\n");
+    // A teammate's machine: nothing in the store, and check still works.
+    const ref = (await resolvePattern(await freshStore(), project)) as PatternRef;
+    expect(ref.name).toBe("tidy");
+    expect((await checkProject(ref.store, ref.name, project)).violations).toEqual([]);
+    // An explicit name still reads the machine's store.
+    expect((await resolvePattern(store, project, "tidy"))?.store).toBe(store);
+    // Linking again without vendoring makes the store the home again.
+    await linkProject(project, "tidy");
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe("pattern: tidy\n");
+  });
+
+  test("a bundle URL as the source is fetched into a temporary store for the run", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "tidy", layout: [{ path: "docs/", required: true }] });
+    const bundle = await exportBundle(
+      store,
+      "tidy",
+      join(await tempDir("dolly-bundle-"), "tidy.dolly"),
+    );
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () => new Response(Bun.file(bundle)),
+    });
+    try {
+      const url = `http://127.0.0.1:${server.port}/tidy.dolly`;
+      const project = await repo({ ".dolly": `pattern: tidy\nsource: ${url}\n`, "docs/a.md": "" });
+      const ref = (await resolvePattern(await freshStore(), project)) as PatternRef;
+      expect(ref.name).toBe("tidy");
+      expect(ref.store).not.toBe(store);
+      expect((await checkProject(ref.store, ref.name, project)).violations).toEqual([]);
+      const wrong = await repo({ ".dolly": `pattern: other\nsource: ${url}\n` });
+      await expect(resolvePattern(await freshStore(), wrong)).rejects.toThrow('holds "tidy"');
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("ignorePaths appends once each and refuses a path outside the project", async () => {
+    const project = await repo({ ".dolly": "pattern: strict\nignore:\n  - legacy/\n" });
+    const marker = await ignorePaths(project, ["legacy/", "shell/*.fish"]);
+    expect(marker.ignore).toEqual(["legacy/", "shell/*.fish"]);
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe(
+      "pattern: strict\nignore:\n  - legacy/\n  - shell/*.fish\n",
+    );
+    await expect(ignorePaths(project, ["../out"])).rejects.toThrow("not a relative path");
+    await expect(ignorePaths(await repo({}), ["x"])).rejects.toThrow("No .dolly marker");
   });
 
   test("the marker's ignore list sets violations aside: counted, never reported, never fixed", async () => {
