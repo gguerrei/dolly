@@ -57,6 +57,7 @@ Active provider and model live in `<dollyHome>/ai.json`, beside the pattern stor
 
 ```
 dolly ai                       # status: provider, model, where the key comes from
+dolly ai --verify              # the same, plus one live call: the provider's verdict on the key, exit 1 on a refusal
 dolly ai connect <provider>    # prompt for the key (no echo), verify live, store in the keychain
 dolly ai use <provider> [--model <id>]
 dolly ai off                   # forget the selection; keys stay put
@@ -66,7 +67,7 @@ dolly ai off                   # forget the selection; keys stay put
 
 ## Semantic placement (v1)
 
-The first consumer, picked by the maintainer (2026-08-14). Fit's planner already enumerates the destinations an ambiguous decline could take (several same-stem sources for a colocated test, several test roots for a separate one) and refuses to guess between them; those candidates now ride the declined item as data. `assistedFit` wraps `fitProject`: with AI off it returns the plan untouched and calls nothing, and with AI on it asks the model to choose among the planner's own candidates, showing it the pattern's prose and relevant facets, the decline's reason, and the file's opening bytes. The reply's first line must match a candidate verbatim or the whole answer is discarded; the model chooses, it never invents a path. A valid pick rides the declined item as a `suggestion` carrying the one-line why and the model's name, and the CLI and the fit view print it labeled as the model's. Apply reads plans, not suggestions, so a wrong pick costs the user a shrug (ground rule 3 made mechanical). One plan asks for at most ten placements, and any provider failure leaves the plan exactly as the planner made it.
+The first consumer, picked by the maintainer (2026-08-14). Fit's planner already enumerates the destinations an ambiguous decline could take (several same-stem sources for a colocated test, several test roots for a separate one) and refuses to guess between them; those candidates now ride the declined item as data. `assistedFit` wraps `fitProject`: with AI off it returns the plan untouched and calls nothing, and with AI on it asks the model to choose among the planner's own candidates, showing it the pattern's prose and relevant facets, the decline's reason, and the file's opening bytes. The reply's first line must match a candidate verbatim or the whole answer is discarded; the model chooses, it never invents a path. A valid pick rides the declined item as a `suggestion` carrying the one-line why and the model's name, and the CLI and the fit view print it labeled as the model's. Apply reads plans, not suggestions, so a wrong pick costs the user a shrug (ground rule 3 made mechanical). One plan asks for at most ten placements, and any provider failure leaves the plan exactly as the planner made it, with the failure on the declined item (`aiError`, printed by the CLI and shown in the fit view), so a revoked key shows in the plan instead of a silent shrug.
 
 ## Learning mode (v1)
 

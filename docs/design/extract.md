@@ -68,13 +68,18 @@ Three evidence classes decide structural vs incidental:
   tool configs…) and directories within the depth cap.
 - **E2 self-declaration**, where the repo asserts structure: workspace globs
   (package.json workspaces, pnpm-workspace.yaml, Cargo `[workspace].members`),
-  `.gitkeep`.
+  `.gitkeep` (evidence for its directory only; the placeholder itself is
+  never a listed file or a shared shape, so a scaffold's empty directories
+  cannot vote their placeholders back into the pattern). Workspace members
+  form a group even with nothing inside them yet.
 - **E3 sibling-shape voting**: if ≥3 sibling dirs share ≥2 internal paths at
   ≥60% support (with the child's own name normalized to `{name}`),
   they generalize to `parent/{name}/` plus the shared core. The same vote runs
   over **file** siblings, so `routers/users.py|items.py|orders.py` becomes
   `routers/{name}.py`. A stoplist (src, tests, utils, components…) separates
-  open-set instance names from structural vocabulary.
+  open-set instance names from structural vocabulary. A core path carrying
+  the source project's own name (a versioned docs page about it) is content,
+  never structure another project could share, and is dropped from the vote.
 
 Files are incidental by default: only anchors, toolchain-claimed configs, and
 template cores are listed. That rule, not the entry budget (50), is the primary
@@ -98,6 +103,10 @@ Excluded from voting: dotfiles, ecosystem-mandated names (README, Dockerfile,
 index.*, __init__.py, lockfiles…), framework route segments (`[id].tsx`,
 `+page.svelte`), and everything under `.github/` (wizard vocabulary). Trailing
 `_test`/`_spec` is stripped so Go/pytest idioms don't cast forced snake votes.
+Directories add the closed structural vocabulary (`src`, `tests`, `lib`,
+`docs`, the layout stoplist): those names carry the ecosystem's case, so they
+neither vote nor are judged, and a PSR-4 tree with PascalCase namespaces under
+a lowercase `src/` still votes PascalCase directories.
 
 Scopes: one global pool, one per-extension bucket, one directories pool.
 A pool emits a facet iff winner ≥ 80% of (votes + dissent) and sample ≥ 5,
@@ -224,9 +233,13 @@ Agreement alone is not safety, though: whatever is *constant across siblings*
 survives the byte-identical test by construction, and a project's identity is
 exactly the kind of thing that is constant (an author's email, a repository
 URL, a homepage). So a final identity gate refuses any capture whose
-normalized text still carries an email address or the source project's own
-name; refusing costs a counted note, while capturing would ship someone else's
-identity inside a shared `.dolly` bundle. Templates live at `templates/<target path>`
+normalized text, or whose target path, still carries an email address or the
+source project's own name; refusing costs a counted note, while capturing
+would ship someone else's identity inside a shared `.dolly` bundle. The name
+is read once per repository (`extract/identity.ts`) from whichever manifest
+the ecosystem has: the npm scope, Cargo.toml, pyproject.toml, go.mod, a
+gemspec, pom.xml, the Gradle settings, composer.json, a solution or project
+file. Templates live at `templates/<target path>`
 inside the pattern, a mirror of the project tree, hand-editable, carried by
 `.dolly` bundles for free.
 
@@ -273,7 +286,9 @@ a minority, or one the carriers disagree on, is left out and named in an
 snake_case; left out"), so the author can settle it by hand. Records
 (commands, versions, dependencies by purpose, naming overrides) agree key
 by key; lists (the sanctioned languages, the commit types) keep the
-members a majority carries, dominant first; layout keeps the entries a
+members a majority carries, dominant first, and the sanctioned languages
+need the repositories to agree on the dominant one first (two repositories
+that share only Shell do not write Shell); layout keeps the entries a
 majority carries, required only when every carrier says so, and names
 the minority's paths in one note. A captured config agrees byte for byte
 or, when it is JSON or TOML, keeps only the keys every copy shares,

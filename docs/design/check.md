@@ -99,11 +99,11 @@ path, a message, and at most one autofix:
 | Rule | Reads | Violation | Autofix |
 |---|---|---|---|
 | `layout` | layout entries with `required: true`, minus the files the toolchain captured (those are the config rule's) | path absent (`{name}` matches any one segment) | create the directory, or the file via new's stub |
-| `naming` | naming facet | file/dir name off-convention (extension overrides win) | none: renames break imports; `fit` (M6) owns them |
+| `naming` | naming facet | file/dir name off-convention (extension overrides win; structural directory names such as src, tests and lib are never judged) | none: renames break imports; `fit` (M6) owns them |
 | `config` | toolchain.configs + binding | captured key missing/unequal (subset) or bytes differ (verbatim) | merge the keys / write the bytes |
 | `commands` | commands facet | verb missing or command unequal in manifest scripts / taskfile | scripts: merge the entry; taskfile: append a missing recipe (a differing recipe is report-only; it may have grown a body dolly must not rewrite) |
 | `license` | license facet | manifest field missing/unequal (npm and TOML manifests alike); LICENSE file absent | set the field; stamp the file (the stamped year comes from the clock, the one deliberate impurity). A LICENSE whose text fingerprints as a *different* id is report-only, since silently replacing license text is not a merge. A missing manifest is never invented, by this rule or config's |
-| `testing` | testing facet | a test file breaking placement or `filePattern` | none: moving tests is `fit`'s job |
+| `testing` | testing facet | a code test file (the languages facet's extensions) breaking placement, or `filePattern` when the file's extension is the shape's own; a test the layout itself demands in place is never a violation (a layout that demands it out of placement is a diagnostic) | none: moving tests is `fit`'s job |
 | `hooks` | toolchain.hooks | the hook manager's config file is absent | none: installing a hook manager is a dependency decision |
 | `env` | built-in, no facet | a `.env`-like file the inventory can see (i.e. not gitignored) | append its name to `.gitignore` |
 | `languages` | languages.programming | a code file in a language outside the list, when the tree carries that language at the extractor's own bar (two files and 1% of the code bytes, or five files); a lone Dockerfile or helper script is a trace, never a violation, and an ambiguous extension is read the way the vote reads it, so data and docs are never code | none: `fit` plans a translate step with the AI layer on ([translation.md](translation.md), ADR-0004) |
@@ -136,7 +136,12 @@ mirroring extract's scanner-per-file layout; reporting order is the
   (next to the source they test, or under a test root like `tests/`) and how
   they are named; mixed evidence degrades to a counted note, per ADR-0003.
   `{stem}` stands for the source file's basename; a `filePattern` without
-  `{stem}` (pytest's `test_*.py` style) checks shape only.
+  `{stem}` (pytest's `test_*.py` style) checks shape only. With a languages
+  facet, only its code extensions count as tests (a `Tests.csproj` is a
+  project file), a shape is judged against its own extension only (a `.cs`
+  shape says nothing about a website's `.mjs` tests, which are judged on
+  placement alone), and a camelCase source set ending in `Test` or `Tests`
+  (`commonTest`, `iosAppUITests`) is a test root like `tests/`.
 - **`toolchain.hooks`**: the hook manager (`husky`, `lefthook`,
   `pre-commit`), fingerprinted from its config file the same way the other
   toolchain roles are. The toolchain facet stays the one owner of tool

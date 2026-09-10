@@ -34,7 +34,9 @@ and the pick rides along as a labeled suggestion; apply never reads it.
 2. **Git is the safety net, and it is mandatory.** Fit refuses a dirty
    working tree outright, and `--apply` first creates a checkpoint branch
    (`dolly/fit-<pattern>-<n>`) at HEAD: "fully revertible" means
-   `git switch` back, not trusting dolly's memory of what it did.
+   `git switch` back, not trusting dolly's memory of what it did. An apply
+   where nothing landed removes the branch again and says the tree is as it
+   was, so a run that failed whole leaves no branch to nowhere.
 3. **Fit plans in the same currency as check.** The plan is data end to
    end: check's rules run first and their `FixPlan`s are adopted verbatim
    (create/append/merge, applied by the same one executor); fit adds the
@@ -53,9 +55,13 @@ and the pick rides along as a labeled suggestion; apply never reads it.
    yet account for references to .py files"), and the presence of importer
    types the ledger cannot open (`.vue`, `.svelte`, `.astro`, `.mdx`)
    declines every move; those files import invisibly, so nothing is
-   accountable. A testing move whose source the pattern's own layout
-   demands in place declines too: that is the pattern contradicting
-   itself, the author's to settle. Never a broken import applied silently.
+   accountable. A test file the pattern's own layout demands in place is
+   never reported by check (a layout that demands it out of placement is
+   the pattern contradicting itself, filed as a diagnostic), so fit never
+   sees it. When two rules want one file (naming a rename, testing a move),
+   the first rule's move is planned and the second is declined until the
+   next run, or is the author's when the first was declined too. Never a
+   broken import applied silently.
 5. **The engine owns fit; the edges render it.** `fitProject` lives in
    `@dollysheep/core` behind the barrel, the CLI prints the plan and asks
    nothing else, and the daemon can serve the same plan as JSON when the

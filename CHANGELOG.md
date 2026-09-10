@@ -312,6 +312,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The completion scripts `dolly completions` wrote failed their shells'
+  parsers: case arms were joined with the two characters backslash and n,
+  and an embedded apostrophe was quoted with two backslashes. The test now
+  hands each script to the shell's own parser.
+- Structural directory names (`src`, `tests`, `lib`, `docs`, the layout
+  stoplist) carry the ecosystem's case, so naming neither votes on them nor
+  judges them; a PSR-4 pattern no longer flags `src/` and `tests/`, and its
+  scaffold passes its own check.
+- The testing rule counts only the languages facet's code extensions as
+  tests (a `Tests.csproj` is a project file), compares a naming shape
+  against its own extension only, knows camelCase source sets ending in
+  `Test` or `Tests` (`commonTest`, `iosAppUITests`) as test roots, and files
+  a diagnostic instead of a violation when the layout itself demands a test
+  file out of placement (a scaffold from such a pattern passes its own check
+  again).
+- The template identity gate reads the manifests of the four newer
+  ecosystems (a gemspec, pom.xml, the Gradle settings, composer.json, a
+  solution or project file, `.slnx` included) and judges a template's path
+  along with its text; the layout vote drops core paths carrying the source
+  project's name. A .NET repository's versioned API docs no longer travel
+  into every scaffold.
+- A `.gitkeep` marks its directory and never becomes a shared file, and an
+  instance under any `{name}` entry's directory chain is not drift, so learn
+  stops proposing a scaffold's own placeholders and instance directories.
+- A placement suggestion that failed says so on the declined item (`aiError`),
+  in the CLI and the fit view, and `dolly ai --verify` makes one live call so
+  a revoked key shows in status rather than inside a consumer.
+- When two rules want one file, the decline names both and waits for the
+  first rule's move, or says the move is the author's when that one was
+  declined too; a fit apply where nothing landed removes its checkpoint branch
+  and says the tree is as it was.
+- `dolly extract` on a file or a missing path says so plainly, and an
+  extraction that found no facets says the directory was not recognizable as
+  a project.
+- Multi-repo extract emits `languages.programming` only when the
+  repositories agree on the dominant language.
+- The pattern view's dependencies panel renders one column when a pattern
+  has only runtime or only development dependencies, and the settings view
+  names translation among what AI does.
 - The remembered project directory did not show in the check, fit, and
   learn views' directory field after the component that owns it was
   extracted: a model set during the parent's own render is swallowed by
