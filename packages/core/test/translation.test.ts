@@ -259,6 +259,20 @@ describe("translation", () => {
     expect(result.verified).toEqual([]); // never reached
   });
 
+  test("an apply where nothing landed removes its checkpoint and says the tree is as it was", async () => {
+    const { store, root } = await pythonProject({ typecheck: "true" });
+    await writeFile(join(root, ".dolly"), "pattern: ts-service\n"); // so no marker step lands either
+    await git(root, "add", "-A");
+    await git(root, "commit", "-q", "-m", "marker");
+    await turnOn();
+    stubModel(() => "I would rather not.");
+    const result = await assistedFitApply(store, "ts-service", root);
+    expect(result.applied).toEqual([]);
+    expect(result.checkpoint).toBeUndefined();
+    expect(result.failures.join("\n")).toContain("the checkpoint branch was removed");
+    expect((await git(root, "branch", "--list", "dolly/*")).trim()).toBe("");
+  });
+
   test("a failing verification keeps every source, commits nothing, and reports the output", async () => {
     const { store, root } = await pythonProject({ typecheck: "own-typecheck" });
     await installTool(root, "own-typecheck", 2, "src/main.ts: type error");

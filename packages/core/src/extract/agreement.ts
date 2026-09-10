@@ -86,7 +86,18 @@ export function agreePatterns(repos: RepoExtract[], name: string): Agreement {
   const license = agree("license", pick("license"));
 
   const languagesIn = pick("languages");
-  const programming = agreeList(languagesIn.map((l) => l?.programming));
+  // A sanctioned list means little unless the repositories agree on what
+  // comes first: two repositories sharing only Shell do not write Shell.
+  const dominant = agree(
+    "the dominant language",
+    languagesIn.map((l) => l?.programming?.[0]),
+  );
+  const programming = dominant
+    ? [
+        dominant,
+        ...agreeList(languagesIn.map((l) => l?.programming)).filter((item) => item !== dominant),
+      ]
+    : [];
   const versions = agreeRecord(
     "languages.versions",
     languagesIn.map((l) => l?.versions),

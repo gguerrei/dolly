@@ -96,6 +96,8 @@ export interface DeclinedItem {
    */
   candidates?: string[];
   suggestion?: PlacementSuggestion;
+  /** Why the AI layer could not suggest, when it was on and tried: a silent shrug hides a dead key. */
+  aiError?: string;
 }
 
 export interface FitPlan {
@@ -132,13 +134,16 @@ export async function fitProject(
 
   /** from → proposed move; built first, thinned by every guard below. */
   const proposals = new Map<string, { rule: string; to: string; reason: string; dir: boolean }>();
+  /** A second rule's move for a file another rule already claims, settled once the guards have run. */
+  const deferred: { from: string; rule: string; reason: string; other: string }[] = [];
   const propose = (rule: string, from: string, to: string, reason: string, dir: boolean) => {
     if (to === from) {
       decline(from, `${reason}, but no mechanical rename resolves it`);
       return;
     }
-    if (proposals.has(from)) {
-      decline(from, "two rules want to move this; apply this plan, then run fit again");
+    const first = proposals.get(from);
+    if (first) {
+      deferred.push({ from, rule, reason, other: first.rule });
       return;
     }
     proposals.set(from, { rule, to, reason, dir });
@@ -318,6 +323,17 @@ export async function fitProject(
       }
     }
   }
+  // One move per file per plan: the second rule waits for the next run when
+  // the first rule's move survived, and is the author's when it did not.
+  for (const { from, rule, reason, other } of deferred) {
+    decline(
+      from,
+      proposals.has(from)
+        ? `${reason}, but ${other} moves this file in the same plan, so apply it and run fit again for ${rule}'s move`
+        : `${reason}, but ${other}'s move of this file was declined too, so this one is yours to make`,
+    );
+  }
+
   const moved = buildMapping();
   const rewrites = planRewrites(scan.edges, moved);
 
@@ -653,7 +669,8 @@ function projectPath(root: string): string {
 
 export interface FitApplyResult {
   plan: FitPlan;
-  checkpoint: string;
+  /** The branch holding the tree as it was; absent when nothing was applied, since the branch is removed then. */
+  checkpoint?: string;
   applied: string[];
   failures: string[];
   /** What the pattern's own commands said about the translations, when there were any. */
@@ -687,7 +704,7 @@ export async function fitApply(
     throw new FitGitError("the working tree is dirty; commit or stash before fit --apply.");
   }
   const plan = await fitProject(store, patternName, root, options);
-  const checkpoint = await createCheckpoint(root, patternName);
+  let checkpoint: string | undefined = await createCheckpoint(root, patternName);
   const { applied, failures } = await applyFitPlan(root, plan, options.translator);
   // Translations are judged by the pattern's own commands before a single
   // source is removed (ADR-0004); a failed verification commits nothing.
@@ -729,8 +746,17 @@ export async function fitApply(
     failures.push(
       "not committed because some steps failed; inspect the working tree (the checkpoint branch still marks the pre-fit state), and delete any translated file left beside its source before planning again",
     );
+  } else {
+    // Nothing landed, so a checkpoint would be a branch to nowhere.
+    await runGit(root, "branch", "-D", checkpoint);
+    checkpoint = undefined;
+    if (failures.length > 0) {
+      failures.push(
+        "nothing was applied, so the checkpoint branch was removed; the tree is as it was",
+      );
+    }
   }
-  return { plan, checkpoint, applied, failures, verified, committed };
+  return { plan, ...(checkpoint ? { checkpoint } : {}), applied, failures, verified, committed };
 }
 
 async function createCheckpoint(root: string, patternName: string): Promise<string> {

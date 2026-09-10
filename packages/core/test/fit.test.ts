@@ -199,6 +199,38 @@ describe("fitProject", () => {
     expect(plan.diagnostics.join("\n")).toContain('layout demands "examples/{name}/demo.test.ts"');
   });
 
+  test("two rules wanting one file: the second waits for the first's move, or is the author's", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "both",
+      naming: { files: "kebab-case" },
+      testing: { placement: "separate" },
+    });
+    const waits = await fitProject(
+      store,
+      "both",
+      await repo({ "src/MyThing.test.ts": "export {};\n", "tests/other.test.ts": "export {};\n" }),
+    );
+    expect(moves(waits).map((m) => m.to)).toEqual(["src/my-thing.test.ts"]);
+    expect(waits.declined.map((d) => d.message).join("\n")).toContain(
+      "naming moves this file in the same plan, so apply it and run fit again for testing's move",
+    );
+    // With a .vue importer in the tree every move is declined, and the second rule's says so.
+    const declined = await fitProject(
+      store,
+      "both",
+      await repo({
+        "src/MyThing.test.ts": "export {};\n",
+        "tests/other.test.ts": "export {};\n",
+        "src/App.vue": "<template />\n",
+      }),
+    );
+    expect(moves(declined)).toHaveLength(0);
+    expect(declined.declined.map((d) => d.message).join("\n")).toContain(
+      "naming's move of this file was declined too, so this one is yours to make",
+    );
+  });
+
   test("a rename keeps the affixes check never judged", async () => {
     const store = await freshStore();
     await seed(store, { name: "kebab", naming: { files: "kebab-case" } });
@@ -403,7 +435,7 @@ describe("fitApply", () => {
     expect(again.steps).toEqual([]);
 
     // Fully revertible: the checkpoint branch holds the pre-fit tree.
-    await git(root, "switch", "-q", result.checkpoint);
+    await git(root, "switch", "-q", result.checkpoint as string);
     expect(await Bun.file(join(root, "src/MyHelper.ts")).exists()).toBe(true);
     expect(await Bun.file(join(root, "src/my-helper.ts")).exists()).toBe(false);
     expect(await Bun.file(join(root, "LICENSE")).exists()).toBe(false);

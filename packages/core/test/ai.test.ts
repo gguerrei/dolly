@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:tes
 import { chmod, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { activeAi, aiOff, aiStatus, connectAi, useAi } from "../src/ai/ai";
+import { activeAi, aiOff, aiStatus, connectAi, useAi, verifyAi } from "../src/ai/ai";
 import { findKey, KeychainUnavailableError, storeKey } from "../src/ai/keys";
 import { assistedFit } from "../src/ai/placement";
 import { AiProviderError, complete, verifyKey } from "../src/ai/providers";
@@ -265,6 +265,16 @@ describe("the switch", () => {
     expect((await aiStatus()).keySource).toBe("missing");
   });
 
+  test("verify makes one live round trip and reports the provider's verdict", async () => {
+    expect(await verifyAi()).toEqual({ status: { provider: null, model: null, keySource: null } });
+    process.env.ANTHROPIC_API_KEY = "sk-verify";
+    await useAi("anthropic");
+    stubFetch(200, { content: [{ type: "text", text: "ok" }] });
+    expect((await verifyAi()).error).toBeUndefined();
+    stubFetch(401, { error: { message: "API key is invalid" } });
+    expect((await verifyAi()).error).toBe("Anthropic: HTTP 401: API key is invalid");
+  });
+
   test("the client completes through the adapter with the resolved key", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-live";
     await useAi("anthropic");
@@ -386,5 +396,9 @@ describe("semantic placement", () => {
     const item = plan.declined.find((d) => d.candidates);
     expect(item).toBeDefined();
     expect(item?.suggestion).toBeUndefined();
+    // Unsuggested, but never silently: the item says which model failed and why.
+    expect(item?.aiError).toBe(
+      "claude-sonnet-5 could not suggest: Anthropic: HTTP 500: overloaded",
+    );
   });
 });

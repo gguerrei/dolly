@@ -17,6 +17,7 @@ export {
   aiStatus,
   connectAi,
   useAi,
+  verifyAi,
 } from "./ai/ai";
 export { draftConventions } from "./ai/conventions";
 export { assistedFit } from "./ai/placement";

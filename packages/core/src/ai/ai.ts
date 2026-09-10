@@ -49,6 +49,24 @@ export async function aiStatus(): Promise<AiStatus> {
   };
 }
 
+/**
+ * The status plus one live round trip on the active key, so a revoked key
+ * shows here instead of inside a consumer. `error` carries the provider's
+ * refusal in its words; it is absent when the layer is off or has no key.
+ */
+export async function verifyAi(): Promise<{ status: AiStatus; error?: string }> {
+  const status = await aiStatus();
+  if (!status.provider || !status.model || status.keySource === "missing") return { status };
+  const found = await findKey(status.provider);
+  if (!found) return { status };
+  try {
+    await verifyKey(status.provider, found.key, status.model);
+    return { status };
+  } catch (error) {
+    return { status, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /** The caller's mistake, not the provider's: an unknown provider, a malformed key, a selection without a key. */
 export class AiUsageError extends Error {
   override name = "AiUsageError";

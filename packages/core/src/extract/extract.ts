@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import type { PatternDocument } from "../pattern/document";
 import { type Pattern, slugify } from "../pattern/schema";
@@ -64,6 +64,9 @@ export async function extractFromRepos(repoPaths: string[], name: string): Promi
 
 async function extractRepo(repoPath: string, name?: string): Promise<RepoExtract> {
   const root = resolve(repoPath);
+  const target = await stat(root).catch(() => null);
+  if (!target) throw new Error(`${repoPath} does not exist.`);
+  if (!target.isDirectory()) throw new Error(`${repoPath} is not a directory.`);
   const inventory = await collectInventory(root);
 
   const languages = await scanLanguages(inventory);

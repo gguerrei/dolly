@@ -39,8 +39,9 @@ export async function assistedFit(
     try {
       const suggestion = await suggest(client, doc, resolve(projectDir), item);
       if (suggestion) item.suggestion = suggestion;
-    } catch {
-      // A failed suggestion never fails the plan.
+    } catch (error) {
+      // A failed suggestion never fails the plan, but it says why it is missing.
+      item.aiError = `${client.model} could not suggest: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
   return plan;

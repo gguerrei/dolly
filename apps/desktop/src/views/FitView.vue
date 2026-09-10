@@ -283,6 +283,7 @@ const gitLine = computed(() => {
                     <code>{{ item.suggestion.pick }}</code>
                     <template v-if="item.suggestion.why">: {{ item.suggestion.why }}</template>
                   </div>
+                  <div v-if="item.aiError" class="note">ai: {{ item.aiError }}</div>
                 </td>
               </tr>
             </tbody>
