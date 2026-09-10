@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -431,6 +431,31 @@ describe("dolly serve", () => {
       body: JSON.stringify({ file: join(project, "package.json") }),
     });
     expect(notABundle.status).toBe(400);
+  });
+
+  test("link vendors the pattern on request, and ignore appends to the marker", async () => {
+    await seedPattern("tidy", DOCS_REQUIRED);
+    const dir = join(home, "vendored");
+    await mkdir(join(dir, "docs"), { recursive: true });
+    const linked = await api("/api/link", {
+      method: "POST",
+      body: JSON.stringify({ dir, pattern: "tidy", vendor: true }),
+    });
+    expect(await linked.json()).toEqual({ pattern: "tidy", vendored: "dolly/tidy" });
+    expect(await readFile(join(dir, "dolly", "tidy", "pattern.md"), "utf8")).toBe(DOCS_REQUIRED);
+    const ignored = await api("/api/ignore", {
+      method: "POST",
+      body: JSON.stringify({ dir, paths: ["legacy/"] }),
+    });
+    expect(ignored.status).toBe(200);
+    expect(((await ignored.json()) as { ignore: string[] }).ignore).toEqual(["legacy/"]);
+    expect(await readFile(join(dir, ".dolly"), "utf8")).toBe(
+      "pattern: tidy\nsource: dolly\nignore:\n  - legacy/\n",
+    );
+    // Check reads the vendored copy: the pattern can leave the store.
+    await rm(join(home, "patterns", "tidy"), { recursive: true });
+    const check = await api("/api/check", { method: "POST", body: JSON.stringify({ dir }) });
+    expect(await check.json()).toMatchObject({ pattern: "tidy", violations: [] });
   });
 
   test("link writes the marker over the wire, and an unknown pattern is a 404", async () => {

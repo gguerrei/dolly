@@ -250,7 +250,7 @@ export async function scaffoldProject(
   seedStarterFiles(dirs, files, pattern, ecosystem);
 
   // The marker `dolly check` resolves the pattern from; meant to be committed.
-  if (!files.has(".dolly")) files.set(".dolly", markerContents(patternName));
+  if (!files.has(".dolly")) files.set(".dolly", markerContents({ pattern: patternName }));
 
   // --- Write everything ----------------------------------------------------
   await writeTree(root, dirs, files, notes);

@@ -10,17 +10,21 @@ import type { FixPlan } from "./fix";
  * conforming project).
  */
 
-export type RuleId =
-  | "layout"
-  | "naming"
-  | "config"
-  | "commands"
-  | "license"
-  | "testing"
-  | "hooks"
-  | "env"
-  | "languages"
-  | "releases";
+/** Every rule, by id: what the marker's `rules` may name. */
+export const RULE_IDS = [
+  "layout",
+  "naming",
+  "config",
+  "commands",
+  "license",
+  "testing",
+  "hooks",
+  "env",
+  "languages",
+  "releases",
+] as const;
+
+export type RuleId = (typeof RULE_IDS)[number];
 
 export interface Violation {
   rule: RuleId;
@@ -29,6 +33,8 @@ export interface Violation {
   message: string;
   /** The autofix, as data; absent when only a human can resolve it. */
   fix?: FixPlan;
+  /** Set when the marker's `rules` turned this rule down: reported, never counted against the exit code. */
+  severity?: "warning";
 }
 
 export interface RuleContext {

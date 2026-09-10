@@ -10,6 +10,7 @@ import {
   assistedFit,
   assistedFitApply,
   type CheckReport,
+  type ConventionsReport,
   checkProject,
   connectAi,
   dollyHome,
@@ -21,6 +22,7 @@ import {
   type FitPlan,
   facetNames,
   gitStateOf,
+  ignorePaths,
   importBundle,
   learnDrift,
   linkProject,
@@ -32,14 +34,15 @@ import {
   type Proposal,
   parsePatternDocument,
   pathLabel,
-  readPatternMarker,
   renderExport,
   renderProposal,
+  resolvePattern,
   saveExtractedPattern,
   saveLearned,
   scaffoldProject,
   serializePatternDocument,
   useAi,
+  VENDOR_DIR,
   verifyAi,
   watchLearning,
   watchProject,
@@ -133,13 +136,13 @@ program
           "--watch and --fix do not combine: a watcher that edits the tree it watches is a feedback loop.",
         );
       }
-      const store = new PatternStore();
-      const name = patternArg ?? (await readPatternMarker(options.dir));
-      if (!name) {
+      const ref = await resolvePattern(new PatternStore(), options.dir, patternArg);
+      if (!ref) {
         throw new Error(
           "No pattern named and no .dolly marker here. Run `dolly check <pattern>` (dolly new writes the marker for you).",
         );
       }
+      const { store, name } = ref;
       const print = (report: CheckReport) =>
         options.json
           ? console.log(JSON.stringify(checkView(name, report)))
@@ -147,7 +150,7 @@ program
       if (!options.watch) {
         const report = await checkProject(store, name, options.dir, { fix: options.fix });
         print(report);
-        if (report.violations.length > 0) process.exitCode = 1;
+        if (failing(report)) process.exitCode = 1;
         return;
       }
       // The engine owns the watch loop; the CLI only prints what it reports.
@@ -179,13 +182,13 @@ program
     "Plan (and with --apply, perform) the moves and fixes that fit a project to its pattern.",
   )
   .action(async (patternArg: string | undefined, options: { dir: string; apply?: boolean }) => {
-    const store = new PatternStore();
-    const name = patternArg ?? (await readPatternMarker(options.dir));
-    if (!name) {
+    const ref = await resolvePattern(new PatternStore(), options.dir, patternArg);
+    if (!ref) {
       throw new Error(
         "No pattern named and no .dolly marker here. Run `dolly fit <pattern>` (dolly new writes the marker for you).",
       );
     }
+    const { store, name } = ref;
     if (!options.apply) {
       // With AI on, ambiguous declines carry a labeled suggestion; the
       // plan itself is fitProject's either way, and apply never reads them.
@@ -225,13 +228,35 @@ program
   .command("link")
   .argument("<pattern>", "pattern to link the project to")
   .option("-C, --dir <dir>", "project directory to link", ".")
+  .option(
+    "--vendor",
+    `copy the pattern into the project under ${VENDOR_DIR}/, so a checkout carries it for CI and teammates`,
+  )
   .description("Write the .dolly marker, so check and fit resolve the pattern without a name.")
-  .action(async (pattern: string, options: { dir: string }) => {
+  .action(async (pattern: string, options: { dir: string; vendor?: boolean }) => {
     const store = new PatternStore();
     if (!(await store.has(pattern))) throw new PatternNotFoundError(pattern);
-    const { replaced } = await linkProject(options.dir, pattern);
+    const { replaced, vendored } = await linkProject(options.dir, pattern, {
+      ...(options.vendor ? { vendorFrom: store } : {}),
+    });
+    const was = replaced ? ` (it was linked to "${replaced}")` : "";
+    const commit = vendored
+      ? `Commit .dolly and ${vendored}/ so every checkout checks against the same pattern.`
+      : "Commit .dolly so the whole team checks against the same pattern.";
+    console.log(`Linked ${options.dir} to "${pattern}"${was}. ${commit}`);
+  });
+
+program
+  .command("ignore")
+  .argument("<paths...>", "relative paths, with * and **, that check leaves alone")
+  .option("-C, --dir <dir>", "project directory whose marker to edit", ".")
+  .description(
+    "Add paths to the .dolly marker's ignore list: known violations set aside, counted, never fixed.",
+  )
+  .action(async (paths: string[], options: { dir: string }) => {
+    const marker = await ignorePaths(options.dir, paths);
     console.log(
-      `Linked ${options.dir} to "${pattern}"${replaced ? ` (it was linked to "${replaced}")` : ""}. Commit .dolly so the whole team checks against the same pattern.`,
+      `Ignoring ${marker.ignore.length} path${marker.ignore.length === 1 ? "" : "s"} in ${options.dir}: ${marker.ignore.join(", ")}.`,
     );
   });
 
@@ -247,13 +272,13 @@ program
       patternArg: string | undefined,
       options: { dir: string; once?: boolean; yes?: boolean },
     ) => {
-      const store = new PatternStore();
-      const name = patternArg ?? (await readPatternMarker(options.dir));
-      if (!name) {
+      const ref = await resolvePattern(new PatternStore(), options.dir, patternArg);
+      if (!ref) {
         throw new Error(
           "No pattern named and no .dolly marker here. Run `dolly learn <pattern>` (dolly new writes the marker for you).",
         );
       }
+      const { store, name } = ref;
       if (!(await store.has(name))) throw new PatternNotFoundError(name);
       const { proposals, changed } = options.once
         ? { proposals: await learnDrift(store, name, options.dir), changed: [] }
@@ -628,6 +653,11 @@ async function reviewProposals(
   return acceptAll || interactive ? accepted : null;
 }
 
+/** Exit 1 is the CI contract, and a warning (the marker's `rules`) never trips it. */
+function failing(report: CheckReport): boolean {
+  return report.violations.some((v) => v.severity !== "warning");
+}
+
 function printCheckReport(name: string, report: CheckReport): void {
   for (const line of report.fixed) console.log(`fixed  ${line}`);
   // Pattern defects are the pattern author's to fix, shown apart from the
@@ -642,17 +672,37 @@ function printCheckReport(name: string, report: CheckReport): void {
       : "";
   if (report.violations.length === 0) {
     console.log(`Clean: this project follows "${name}"${ignored}.`);
+    if (report.conventions) printConventions(report.conventions);
     return;
   }
   if (report.fixed.length > 0 || report.diagnostics.length > 0) console.log("");
   for (const v of report.violations) {
-    console.log(`${v.rule.padEnd(8)} ${v.path}: ${v.message}${v.fix ? " [fixable]" : ""}`);
+    const tags = `${v.fix ? " [fixable]" : ""}${v.severity === "warning" ? " [warning]" : ""}`;
+    console.log(`${v.rule.padEnd(8)} ${v.path}: ${v.message}${tags}`);
   }
   const fixable = report.violations.filter((v) => v.fix).length;
+  const warnings = report.violations.filter((v) => v.severity === "warning").length;
   const plural = report.violations.length === 1 ? "" : "s";
+  const notes = [
+    ...(fixable > 0 ? [`${fixable} fixable; run \`dolly check --fix\``] : []),
+    ...(warnings > 0
+      ? [`${warnings} warning${warnings === 1 ? "" : "s"} by .dolly, not counted`]
+      : []),
+  ];
   console.log(
-    `\n${report.violations.length} violation${plural}${fixable > 0 ? ` (${fixable} fixable; run \`dolly check --fix\`)` : ""}${ignored}.`,
+    `\n${report.violations.length} violation${plural}${notes.length ? ` (${notes.join("; ")})` : ""}${ignored}.`,
   );
+  if (report.conventions) printConventions(report.conventions);
+}
+
+/** The model's findings, in their own section: labeled as its reading, and never in the count above. */
+function printConventions(conventions: ConventionsReport): void {
+  console.log(`\nConventions, as ${conventions.model} reads them (not counted):`);
+  if (conventions.findings.length === 0) console.log("  nothing to report");
+  for (const finding of conventions.findings) {
+    console.log(`  ${finding.path}${finding.line ? `:${finding.line}` : ""}: ${finding.message}`);
+  }
+  for (const line of conventions.skipped) console.log(`  skipped ${line}`);
 }
 
 function printAiStatus(status: AiStatus): void {

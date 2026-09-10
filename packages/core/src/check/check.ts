@@ -1,7 +1,7 @@
 import { watch } from "node:fs";
 import { resolve } from "node:path";
 import { matchesGlob } from "../extract/globs";
-import { readMarker } from "../marker";
+import { type RuleSetting, readMarker } from "../marker";
 import type { Pattern } from "../pattern/schema";
 import type { PatternStore } from "../store";
 import { collectInventory, comparePaths, DENY_DIRS } from "../tree/inventory";
@@ -58,8 +58,23 @@ export interface CheckReport {
   fixed: string[];
   /** Defects of the pattern (or failed fixes), not of the project. */
   diagnostics: string[];
-  /** Violations the project's `.dolly` ignore list set aside. */
+  /** Violations the project's `.dolly` ignore list and rule settings set aside. */
   ignored: number;
+  /** The model's reading of the prose conventions, only under `--conventions` with AI on; never counted. */
+  conventions?: ConventionsReport;
+}
+
+export interface ConventionFinding {
+  path: string;
+  line?: number;
+  message: string;
+}
+
+export interface ConventionsReport {
+  model: string;
+  findings: ConventionFinding[];
+  /** Files the bounds left out, each with the reason. */
+  skipped: string[];
 }
 
 export async function checkProject(
@@ -71,9 +86,9 @@ export async function checkProject(
   const { pattern } = await store.load(patternName);
   const root = resolve(projectDir);
   const patternDir = store.dirOf(patternName);
-  const marker = await ignoreList(root);
+  const marker = await markerSettings(root);
 
-  const first = await runRules(root, pattern, patternName, patternDir, marker.ignore);
+  const first = await runRules(root, pattern, patternName, patternDir, marker);
   if (!options.fix) {
     return { ...first, fixed: [], diagnostics: [...marker.diagnostics, ...first.diagnostics] };
   }
@@ -98,7 +113,7 @@ export async function checkProject(
   }
   // Re-run so the report reflects the fixed tree: a fix that did not stick
   // resurfaces here instead of being reported as resolved.
-  const second = await runRules(root, pattern, patternName, patternDir, marker.ignore);
+  const second = await runRules(root, pattern, patternName, patternDir, marker);
   return {
     ...second,
     fixed,
@@ -106,12 +121,21 @@ export async function checkProject(
   };
 }
 
-/** The marker's ignore list; a marker that does not parse applies nothing and says so. */
-async function ignoreList(root: string): Promise<{ ignore: string[]; diagnostics: string[] }> {
+/** The project's own word from the marker: paths to ignore and rules turned off or down. */
+interface MarkerSettings {
+  ignore: string[];
+  rules: Partial<Record<RuleId, RuleSetting>>;
+  diagnostics: string[];
+}
+
+/** A marker that does not parse applies nothing and says so. */
+async function markerSettings(root: string): Promise<MarkerSettings> {
   try {
-    return { ignore: (await readMarker(root))?.ignore ?? [], diagnostics: [] };
+    const marker = await readMarker(root);
+    return { ignore: marker?.ignore ?? [], rules: marker?.rules ?? {}, diagnostics: [] };
   } catch (error) {
-    return { ignore: [], diagnostics: [error instanceof Error ? error.message : String(error)] };
+    const message = error instanceof Error ? error.message : String(error);
+    return { ignore: [], rules: {}, diagnostics: [message] };
   }
 }
 
@@ -162,7 +186,7 @@ async function runRules(
   pattern: Pattern,
   patternName: string,
   patternDir: string,
-  ignore: string[],
+  { ignore, rules }: MarkerSettings,
 ): Promise<{ violations: Violation[]; diagnostics: string[]; ignored: number }> {
   const inventory = await collectInventory(root);
   const diagnostics: string[] = [];
@@ -176,8 +200,14 @@ async function runRules(
   };
   const found: Violation[] = [];
   for (const rule of RULES) found.push(...(await rule.check(context)));
-  // The project's own word: an ignored violation is neither reported nor fixed.
-  const violations = found.filter((violation) => !isIgnored(violation.path, ignore));
+  // The project's own word: an ignored violation, or one from a rule turned
+  // off, is neither reported nor fixed; a rule turned down still reports.
+  const violations: Violation[] = [];
+  for (const violation of found) {
+    const setting = rules[violation.rule];
+    if (setting === "off" || isIgnored(violation.path, ignore)) continue;
+    violations.push(setting === "warn" ? { ...violation, severity: "warning" } : violation);
+  }
   const order = (id: RuleId) => RULES.findIndex((rule) => rule.id === id);
   violations.sort((a, b) => order(a.rule) - order(b.rule) || comparePaths(a.path, b.path));
   return { violations, diagnostics, ignored: found.length - violations.length };
