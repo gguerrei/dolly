@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { parse as parseToml } from "smol-toml";
 import type { Scaffold } from "../pattern/schema";
-import { comparePaths, type Inventory, rootFiles } from "../tree/inventory";
+import { comparePaths, type Inventory } from "../tree/inventory";
 import { hasMachinePath, identityMarker, isBinary, wholeWord } from "./capture";
+import type { ProjectIdentity } from "./identity";
 import type { TemplateGroup } from "./layout";
 
 /**
@@ -28,19 +28,20 @@ export interface ScaffoldScan {
 export async function scanScaffold(
   inventory: Inventory,
   groups: TemplateGroup[],
+  { scope, name: identity }: ProjectIdentity,
 ): Promise<ScaffoldScan> {
   const notes: string[] = [];
   const files: Record<string, string> = {};
   const templates: string[] = [];
-  const scope = await packageScope(inventory);
-  const identity = scope ?? (await manifestProjectName(inventory));
 
   for (const group of [...groups].sort((a, b) => comparePaths(a.target, b.target))) {
     if (group.members.length < 2) continue;
     const normalized: string[] = [];
-    let blocked: string | undefined;
+    // The path is part of the file too: a docs page named after the project stays home.
+    let blocked = pathMarker(group.target, identity);
 
     for (const member of group.members) {
+      if (blocked) break;
       const file = Bun.file(join(inventory.root, member.path));
       if (file.size > SCAFFOLD_TUNING.maxCaptureBytes) {
         blocked = `over ${SCAFFOLD_TUNING.maxCaptureBytes / 1024} KiB`;
@@ -108,44 +109,8 @@ function placeholderize(contents: string, name: string, scope: string | undefine
   return scope ? withName.replace(wholeWord(`@${scope}`), "@{{project}}") : withName;
 }
 
-/** The npm scope members are published under, from the root manifest's name. */
-async function packageScope(inventory: Inventory): Promise<string | undefined> {
-  try {
-    const { name } = JSON.parse(await Bun.file(join(inventory.root, "package.json")).text()) as {
-      name?: string;
-    };
-    if (typeof name !== "string" || name === "") return undefined;
-    return name.startsWith("@") ? (name.slice(1).split("/")[0] as string) : name;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * The source project's own name outside npm (Cargo.toml, pyproject.toml, or
- * go.mod), so the identity gate is not blind in those ecosystems.
- */
-async function manifestProjectName(inventory: Inventory): Promise<string | undefined> {
-  const atRoot = rootFiles(inventory);
-  const read = (name: string) => Bun.file(join(inventory.root, name)).text();
-  try {
-    if (atRoot.has("Cargo.toml")) {
-      const pkg = (parseToml(await read("Cargo.toml")) as Record<string, unknown>).package as
-        | { name?: string }
-        | undefined;
-      if (typeof pkg?.name === "string" && pkg.name !== "") return pkg.name;
-    }
-    if (atRoot.has("pyproject.toml")) {
-      const project = (parseToml(await read("pyproject.toml")) as Record<string, unknown>)
-        .project as { name?: string } | undefined;
-      if (typeof project?.name === "string" && project.name !== "") return project.name;
-    }
-    if (atRoot.has("go.mod")) {
-      const module = (await read("go.mod")).match(/^module\s+(\S+)/m)?.[1];
-      if (module) return module.split("/").pop();
-    }
-  } catch {
-    // A manifest that will not parse already cost its own facets elsewhere.
-  }
-  return undefined;
+/** The identity gate's verdict on a template's own path, in the note's words. */
+function pathMarker(target: string, identity: string | undefined): string | undefined {
+  const marker = identityMarker(target, identity);
+  return marker ? `${marker} in its path` : undefined;
 }

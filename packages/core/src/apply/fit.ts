@@ -3,7 +3,6 @@ import { basename, delimiter, join, resolve } from "node:path";
 import { checkProject } from "../check/check";
 import { applyFix, type FixPlan, losingCreates, previewFix } from "../check/fix";
 import type { Violation } from "../check/rule";
-import { nameRegex } from "../check/rules/layout";
 import { existsOnDisk } from "../check/support";
 import { primaryExtensionOf } from "../extract/languages";
 import { extensionOf, renderStem } from "../extract/naming";
@@ -168,20 +167,6 @@ export async function fitProject(
       continue;
     }
     if (violation.rule === "testing") {
-      // A path the pattern's own layout demands is not misplaced. Moving it
-      // would contradict the pattern; that conflict is the author's to settle.
-      const demanded = pattern.layout.find((entry) =>
-        entry.path.includes("{name}")
-          ? nameRegex(entry.path).test(violation.path)
-          : entry.path === violation.path,
-      );
-      if (demanded) {
-        decline(
-          violation.path,
-          `${violation.message}, but the pattern's layout demands "${demanded.path}", so the testing facet contradicts it; settle the pattern first`,
-        );
-        continue;
-      }
       const move = testingMove(
         violation.path,
         pattern,

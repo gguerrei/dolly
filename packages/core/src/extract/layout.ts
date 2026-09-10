@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import type { LayoutEntry } from "../pattern/schema";
 import { readIfExists, readJsonSafe } from "../tree/files";
 import { comparePaths, type Inventory } from "../tree/inventory";
+import { identityMarker } from "./capture";
 import { expandGlobs } from "./globs";
 
 /**
@@ -23,8 +24,12 @@ export const LAYOUT_TUNING = {
   coreRatio: [6, 10] as const,
 };
 
-/** Closed structural vocabulary: these names are the pattern, not instances of it. */
-const STOPLIST = new Set([
+/**
+ * Closed structural vocabulary: these names are the pattern, not instances of
+ * it, and they carry the ecosystem's case rather than the author's (naming
+ * never votes on them or judges them).
+ */
+export const STRUCTURAL_DIRS = new Set([
   "src",
   "lib",
   "test",
@@ -103,6 +108,9 @@ const ROOT_VOCAB = new Set([
   "spec",
 ]);
 
+/** A placeholder that keeps an empty directory in git: evidence for the directory, never a file. */
+const PLACEHOLDER = /(^|\/)\.(gitkeep|keep)$/;
+
 /** Names that never vote in file-sibling groups. */
 const FILE_GROUP_EXCLUDED =
   /^(__init__|index|main|mod|types?|utils?|helpers?|constants?|README|__main__)\./i;
@@ -125,6 +133,7 @@ export interface TemplateGroup {
 export async function scanLayout(
   inventory: Inventory,
   claimedConfigs: Set<string>,
+  identity?: string,
 ): Promise<LayoutScan> {
   const notes: string[] = [];
   const childrenDirs = new Map<string, string[]>();
@@ -139,9 +148,7 @@ export async function scanLayout(
 
   const workspaceParents = await workspaceMembers(inventory);
   const gitkeepDirs = new Set(
-    inventory.files
-      .filter((f) => /(^|\/)\.(gitkeep|keep)$/.test(f.path))
-      .map((f) => parentOf(f.path)),
+    inventory.files.filter((f) => PLACEHOLDER.test(f.path)).map((f) => parentOf(f.path)),
   );
 
   const entries: LayoutEntry[] = [];
@@ -155,7 +162,15 @@ export async function scanLayout(
     if (isConsumed(parent, consumed)) continue;
     const children = (childrenDirs.get(parent) ?? []).filter((d) => !isConsumed(d, consumed));
     const workspace = workspaceParents.get(parent);
-    const group = voteDirGroup(parent, children, workspace, childrenDirs, childrenFiles, notes);
+    const group = voteDirGroup(
+      parent,
+      children,
+      workspace,
+      childrenDirs,
+      childrenFiles,
+      notes,
+      identity,
+    );
     if (!group) continue;
     for (const entry of group.entries) entries.push(entry);
     for (const member of group.members) consumed.add(member);
@@ -178,7 +193,7 @@ export async function scanLayout(
     if (isConsumed(dir, consumed)) continue;
     if ((childrenDirs.get(dir) ?? []).length > 0) continue;
     if (dir.split("/").some((s) => s.startsWith("."))) continue; // .github/… is tool vocabulary
-    if (STOPLIST.has(basenameOf(dir)) || inventory.vendored.includes(dir)) continue;
+    if (STRUCTURAL_DIRS.has(basenameOf(dir)) || inventory.vendored.includes(dir)) continue;
     const files = (childrenFiles.get(dir) ?? [])
       .map(basenameOf)
       .filter((name) => !FILE_GROUP_EXCLUDED.test(name) && !name.startsWith("."));
@@ -281,12 +296,13 @@ function voteDirGroup(
   childrenDirs: Map<string, string[]>,
   childrenFiles: Map<string, string[]>,
   notes: string[],
+  identity: string | undefined,
 ): DirGroup | undefined {
   const candidates = workspace && workspace.length >= 2 ? workspace : children;
   const n = candidates.length;
   if (!workspace) {
     if (n < LAYOUT_TUNING.minGroup) return undefined;
-    const stoplisted = candidates.filter((d) => STOPLIST.has(basenameOf(d))).length;
+    const stoplisted = candidates.filter((d) => STRUCTURAL_DIRS.has(basenameOf(d))).length;
     if (stoplisted * 2 >= n) return undefined;
   }
   if (n < 2) return undefined;
@@ -301,8 +317,10 @@ function voteDirGroup(
         shape.add(`${normalizeToken(relative(child, d), name)}/`);
         if (depth < LAYOUT_TUNING.templateInnerDepth) inner(d, depth + 1);
       }
-      for (const f of childrenFiles.get(prefix) ?? [])
+      for (const f of childrenFiles.get(prefix) ?? []) {
+        if (PLACEHOLDER.test(f)) continue; // a .gitkeep marks its directory, never a shared file
         shape.add(normalizeToken(relative(child, f), name));
+      }
     };
     inner(child, 1);
     shapes.set(child, shape);
@@ -317,8 +335,14 @@ function voteDirGroup(
     workspace && n < LAYOUT_TUNING.minGroup
       ? n
       : Math.max(LAYOUT_TUNING.minGroup, Math.ceil((n * num) / den));
-  const core = [...support.entries()].filter(([, s]) => s >= coreSupport).map(([p]) => p);
+  // A path carrying the source project's own name (a versioned docs page
+  // about it) is content, never structure another project could share.
+  const core = [...support.entries()]
+    .filter(([p, s]) => s >= coreSupport && !identityMarker(p, identity))
+    .map(([p]) => p);
   const members = candidates.filter((child) => {
+    // Self-declared workspace members are a group even with nothing inside yet.
+    if (core.length === 0) return workspace !== undefined;
     const shape = shapes.get(child) as Set<string>;
     const hits = core.filter((p) => shape.has(p)).length;
     return hits >= Math.max(1, Math.ceil(core.length / 2));

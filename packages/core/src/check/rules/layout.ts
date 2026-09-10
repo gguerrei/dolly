@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { stubContents } from "../../apply/content";
 import { ecosystemOfPattern, isManifestName } from "../../extract/registry";
-import { isSafePatternPath, slugify } from "../../pattern/schema";
+import { isSafePatternPath, type LayoutEntry, type Pattern, slugify } from "../../pattern/schema";
 import { invisibleFile, type Rule, type Violation } from "../rule";
 import { existsOnDisk } from "../support";
 
@@ -75,4 +75,11 @@ export const layoutRule: Rule = {
 export function nameRegex(path: string): RegExp {
   const parts = path.split("{name}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return new RegExp(`^${parts.join("[^/]+")}$`);
+}
+
+/** The layout entry demanding this exact path, if any: such a file is where the pattern wants it. */
+export function demandedByLayout(pattern: Pattern, path: string): LayoutEntry | undefined {
+  return pattern.layout.find((entry) =>
+    entry.path.includes("{name}") ? nameRegex(entry.path).test(path) : entry.path === path,
+  );
 }

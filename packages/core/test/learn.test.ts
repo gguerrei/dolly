@@ -45,9 +45,16 @@ describe("drift", () => {
         { path: "packages/", required: true },
         { path: "packages/{name}/", required: false },
         { path: "packages/{name}/src/", required: true },
+        { path: "src/", required: true },
+        { path: "src/adapter/", required: false },
+        { path: "src/adapter/{name}/index.ts", required: true },
       ],
     });
-    const root = await repo({ "packages/lamb/src/index.ts": "export {};\n" });
+    // The second instance sits under a {name} entry's directory, with no entry for the directory itself.
+    const root = await repo({
+      "packages/lamb/src/index.ts": "export {};\n",
+      "src/adapter/hono/index.ts": "export {};\n",
+    });
     const layout = (await learnDrift(store, "mono", root)).filter((p) => p.path[0] === "layout");
     expect(layout).toEqual([]);
   });

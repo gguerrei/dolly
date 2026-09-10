@@ -1,5 +1,7 @@
-import type { Testing } from "../pattern/schema";
+import type { Languages, Testing } from "../pattern/schema";
 import type { Inventory } from "../tree/inventory";
+import { extensionsOfLanguages } from "./languages";
+import { extensionOf } from "./naming";
 
 /**
  * Votes the testing facet from where test files actually sit and what they
@@ -16,6 +18,11 @@ export const TESTING_TUNING = {
 };
 
 const TEST_ROOTS = new Set(["test", "tests", "__tests__", "spec"]);
+
+/** A test root: one of the classic names, or a camelCase source set ending in Test(s) (commonTest, iosAppUITests). */
+function isTestRoot(segment: string): boolean {
+  return TEST_ROOTS.has(segment) || /^[A-Za-z0-9]+Tests?$/.test(segment);
+}
 
 /** Basename shapes that mark a file as a test, most specific first. */
 const NAME_SHAPES: { pattern: RegExp; generalize: (basename: string) => string }[] = [
@@ -55,12 +62,20 @@ export function isTestFile(path: string): boolean {
 
 /** Where this test file sits: under a test root, or next to what it tests. */
 export function placementOf(path: string): "colocated" | "separate" {
-  return path
-    .split("/")
-    .slice(0, -1)
-    .some((segment) => TEST_ROOTS.has(segment))
-    ? "separate"
-    : "colocated";
+  return path.split("/").slice(0, -1).some(isTestRoot) ? "separate" : "colocated";
+}
+
+/** With a languages facet, only its code extensions can be tests: a Tests.csproj is a project file. */
+export function codeExtensions(languages: Languages | undefined): Set<string> | undefined {
+  return languages?.programming?.length ? extensionsOfLanguages(languages.programming) : undefined;
+}
+
+/** True for a test-shaped file the pattern counts as code. */
+export function isJudgedTest(path: string, allowed: Set<string> | undefined): boolean {
+  if (!isTestFile(path)) return false;
+  if (allowed === undefined) return true;
+  const extension = extensionOf(path.slice(path.lastIndexOf("/") + 1));
+  return extension !== undefined && allowed.has(extension);
 }
 
 /** The `{stem}` generalization of a test basename, e.g. "{stem}.test.ts". */
@@ -88,9 +103,10 @@ export interface TestingScan {
   notes: string[];
 }
 
-export function scanTesting(inventory: Inventory): TestingScan {
+export function scanTesting(inventory: Inventory, languages?: Languages): TestingScan {
   const notes: string[] = [];
-  const tests = inventory.files.filter((f) => isTestFile(f.path)).map((f) => f.path);
+  const allowed = codeExtensions(languages);
+  const tests = inventory.files.filter((f) => isJudgedTest(f.path, allowed)).map((f) => f.path);
   if (tests.length < TESTING_TUNING.minSample) return { notes };
 
   const [num, den] = TESTING_TUNING.winRatio;
