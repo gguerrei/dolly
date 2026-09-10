@@ -192,10 +192,11 @@ describe("fitProject", () => {
       "tests/other.test.ts": "export {};\n",
     });
     const plan = await fitProject(store, "contradictory", root);
+    // The file is where its layout entry wants it: no move, no decline, and the
+    // contradiction is the pattern's, filed as a diagnostic.
     expect(moves(plan)).toHaveLength(0);
-    expect(plan.declined.map((d) => d.message).join("\n")).toContain(
-      "the pattern's layout demands",
-    );
+    expect(plan.declined).toEqual([]);
+    expect(plan.diagnostics.join("\n")).toContain('layout demands "examples/{name}/demo.test.ts"');
   });
 
   test("a rename keeps the affixes check never judged", async () => {
@@ -251,17 +252,15 @@ describe("fitProject", () => {
     const store = await freshStore();
     await seed(store, {
       name: "twist",
-      naming: { directories: "PascalCase" },
-      testing: { placement: "separate" },
+      naming: { files: "kebab-case", directories: "PascalCase" },
     });
     const root = await repo({
       "App/user.ts": "export const u = 1;\n",
-      "App/user.test.ts": 'import { u } from "./user";\nexport const t = u;\n',
-      "test/helpers.test.ts": "export {};\n",
+      "handlers/MyThing.ts": "export const t = 1;\n",
     });
     const plan = await fitProject(store, "twist", root);
-    // The dir rename test/ → Test/ proceeds; the file move into test/ waits.
-    expect(moves(plan).map((m) => m.from)).toEqual(["test/"]);
+    // The dir rename handlers/ → Handlers/ proceeds; the file rename inside it waits.
+    expect(moves(plan).map((m) => m.from)).toEqual(["handlers/"]);
     expect(plan.declined.map((d) => d.message).join("\n")).toContain(
       "being renamed in this same plan",
     );

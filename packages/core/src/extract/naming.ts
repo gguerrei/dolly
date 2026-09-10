@@ -1,6 +1,7 @@
 import type { CaseStyle, Languages, Naming } from "../pattern/schema";
 import type { Inventory } from "../tree/inventory";
 import { extensionsOfLanguages } from "./languages";
+import { STRUCTURAL_DIRS } from "./layout";
 
 /**
  * Detects case conventions by majority vote over filename stems. A name votes
@@ -108,7 +109,7 @@ export function scanNaming(inventory: Inventory, languages?: Languages): NamingS
     if (dir === ".github" || dir.startsWith(".github/")) continue;
     if (codeDirs !== undefined && !codeDirs.has(dir)) continue;
     const basename = dir.slice(dir.lastIndexOf("/") + 1);
-    if (basename.startsWith(".")) continue;
+    if (isMandatedDir(basename)) continue;
     const stem = normalizeStem(basename);
     if (stem !== "") castVote(directories, stem);
   }
@@ -175,6 +176,11 @@ export function isMandated(path: string, basename: string): boolean {
   if (lower.startsWith("tsconfig") && lower.endsWith(".json")) return true;
   const stem = basename.includes(".") ? basename.slice(0, basename.indexOf(".")) : basename;
   return MANDATED_STEMS.has(stem.toLowerCase());
+}
+
+/** Dotted and structural directory names (src, tests, lib…) carry the ecosystem's case, not the author's. */
+export function isMandatedDir(basename: string): boolean {
+  return basename.startsWith(".") || STRUCTURAL_DIRS.has(basename);
 }
 
 /** The directories that hold code (at any depth), the ones naming is about. */

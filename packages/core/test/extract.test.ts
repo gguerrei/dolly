@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { checkProject } from "../src/check/check";
 import { extractFromRepos, extractPattern, saveExtractedPattern } from "../src/extract/extract";
 import { normalizeStem, scanNaming } from "../src/extract/naming";
+import { placementOf } from "../src/extract/testing";
 import { parsePatternDocument, serializePatternDocument } from "../src/pattern/document";
 import { collectInventory } from "../src/tree/inventory";
 import { cleanupTempRoots, freshStore, repo } from "./support";
@@ -749,6 +750,86 @@ describe("extract end to end", () => {
     );
     expect(document.pattern.scaffold?.templates ?? []).not.toContain("crates/{name}/Cargo.toml");
     expect(document.prose).toContain('the source project\'s name ("myproj")');
+  });
+
+  test("the identity gate reads a solution file, a pom, and the template's own path", async () => {
+    const docs = await extractPattern(
+      await repo({
+        "Acme.sln": "Microsoft Visual Studio Solution File, Format Version 12.00\n",
+        "docs/v1/index.md": "# v1\n",
+        "docs/v2/index.md": "# v2\n",
+        "docs/v3/index.md": "# v3\n",
+        "docs/v1/api/Acme.Text.md": "# Text helpers\n",
+        "docs/v2/api/Acme.Text.md": "# Text helpers\n",
+        "docs/v3/api/Acme.Text.md": "# Text helpers\n",
+      }),
+      "acme",
+    );
+    expect(docs.document.pattern.scaffold?.templates ?? []).toContain("docs/{name}/index.md");
+    expect(docs.document.pattern.scaffold?.templates ?? []).not.toContain(
+      "docs/{name}/api/Acme.Text.md",
+    );
+    // Nor does the layout vote list a path carrying the name as structure.
+    expect(docs.document.pattern.layout.map((e) => e.path)).toContain("docs/{name}/index.md");
+    expect(docs.document.pattern.layout.map((e) => e.path)).not.toContain(
+      "docs/{name}/api/Acme.Text.md",
+    );
+
+    const module = (name: string) => `<project><artifactId>${name}</artifactId></project>\n`;
+    const maven = await extractPattern(
+      await repo({
+        "pom.xml":
+          "<project><parent><artifactId>starter-parent</artifactId></parent>" +
+          "<artifactId>shop</artifactId></project>\n",
+        "modules/cart/pom.xml": module("cart"),
+        "modules/orders/pom.xml": module("orders"),
+        "modules/users/pom.xml": module("users"),
+        "modules/cart/README.md": "Part of shop.\n",
+        "modules/orders/README.md": "Part of shop.\n",
+        "modules/users/README.md": "Part of shop.\n",
+      }),
+      "shop",
+    );
+    expect(maven.document.pattern.scaffold?.templates ?? []).toContain("modules/{name}/pom.xml");
+    expect(maven.document.pattern.scaffold?.templates ?? []).not.toContain(
+      "modules/{name}/README.md",
+    );
+    expect(maven.document.prose).toContain('the source project\'s name ("shop")');
+  });
+
+  test("a .gitkeep marks its directory, never a file the siblings share", async () => {
+    const { document } = await extractPattern(
+      await repo({
+        "package.json": JSON.stringify({ name: "kept", workspaces: ["benchmarks/*"] }),
+        "benchmarks/fetch/.gitkeep": "",
+        "benchmarks/jsx/.gitkeep": "",
+        "benchmarks/routers/.gitkeep": "",
+      }),
+      "kept",
+    );
+    const paths = document.pattern.layout.map((e) => e.path);
+    expect(paths).toContain("benchmarks/{name}/");
+    expect(paths.some((p) => p.endsWith(".gitkeep"))).toBe(false);
+  });
+
+  test("source sets ending in Test or Tests are test roots too", () => {
+    expect(placementOf("chat/src/backendTest/kotlin/ChatTest.kt")).toBe("separate");
+    expect(placementOf("iosApp/iosAppUITests/iosAppUITests.swift")).toBe("separate");
+    expect(placementOf("src/latest/ThingTest.kt")).toBe("colocated");
+  });
+
+  test("structural directories neither vote nor abstain in the naming vote", async () => {
+    const inventory = await collectInventory(
+      await repo({
+        "src/Cookie/Jar.php": "<?php\n",
+        "src/Handler/Curl.php": "<?php\n",
+        "src/Exception/Timeout.php": "<?php\n",
+        "tests/Cookie/JarTest.php": "<?php\n",
+        "tests/Handler/CurlTest.php": "<?php\n",
+      }),
+    );
+    const { naming } = scanNaming(inventory, { programming: ["PHP"], versions: {} });
+    expect(naming?.directories).toBe("PascalCase");
   });
 
   test("colocated tests vote a testing facet with their naming shape", async () => {

@@ -273,6 +273,60 @@ describe("checkProject", () => {
     expect(report.violations.map((v) => v.path)).toEqual(["src/foo.test.ts", "tests/bar.spec.ts"]);
   });
 
+  test("the testing rule judges code, and a shape only against its own extension", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "xunit",
+      languages: { programming: ["C#", "JavaScript"] },
+      testing: { placement: "separate", filePattern: "{stem}Tests.cs" },
+    });
+    const project = await repo({
+      "tests/Cart.Tests/Cart.Tests.csproj": "<Project />\n", // a project file, never a test
+      "tests/Cart.Tests/CartTests.cs": "",
+      "tests/Cart.Tests/PriceTest.cs": "", // its own extension, so its shape is judged
+      "website/tests/links.test.mjs": "", // another ecosystem's test: placement only
+      "website/src/links.test.mjs": "",
+    });
+    const report = await checkProject(store, "xunit", project);
+    expect(report.violations.map((v) => v.path)).toEqual([
+      "tests/Cart.Tests/PriceTest.cs",
+      "website/src/links.test.mjs",
+    ]);
+  });
+
+  test("a test file the pattern's own layout demands in place is not misplaced", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "docsy",
+      layout: [{ path: "docs_src/{name}/test_main.py", required: false }],
+      testing: { placement: "separate" },
+    });
+    const project = await repo({
+      "docs_src/app01/main.py": "",
+      "docs_src/app01/test_main.py": "",
+      "src/test_other.py": "",
+    });
+    const report = await checkProject(store, "docsy", project);
+    expect(report.violations.map((v) => v.path)).toEqual(["src/test_other.py"]);
+  });
+
+  test("structural directory names carry the ecosystem's case, never the author's", async () => {
+    const store = await freshStore();
+    await seed(store, {
+      name: "psr",
+      languages: { programming: ["PHP"] },
+      naming: { files: "PascalCase", directories: "PascalCase" },
+    });
+    const project = await repo({
+      "src/Cookie/Jar.php": "<?php\n",
+      "src/Handler/Curl.php": "<?php\n",
+      "tests/Cookie/JarTest.php": "<?php\n",
+      "tests/handlers/CurlTest.php": "<?php\n",
+    });
+    const report = await checkProject(store, "psr", project);
+    expect(report.violations.map((v) => v.path)).toEqual(["tests/handlers/"]);
+  });
+
   test("TOML manifests get the license field checked, comments blocking the rewrite", async () => {
     const store = await freshStore();
     await seed(store, { name: "crabby", license: "MIT" });

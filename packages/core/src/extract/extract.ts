@@ -8,6 +8,7 @@ import { agreePatterns } from "./agreement";
 import { scanCommands } from "./commands";
 import { scanCommits } from "./commits";
 import { scanDependencies } from "./dependencies";
+import { projectIdentity } from "./identity";
 import { scanLanguages } from "./languages";
 import { scanLayout } from "./layout";
 import { scanLicense } from "./license";
@@ -76,12 +77,14 @@ async function extractRepo(repoPath: string, name?: string): Promise<RepoExtract
       (sourceId) => sourceId.split("#")[0] as string,
     ),
   );
-  const layout = await scanLayout(inventory, claimedConfigs);
+  // What no pattern may carry away: the project's own name, in a path or a template.
+  const identity = await projectIdentity(inventory);
+  const layout = await scanLayout(inventory, claimedConfigs, identity.name);
   const naming = scanNaming(inventory, languages.languages);
   const commands = await scanCommands(inventory, toolchain.toolchain);
   const license = await scanLicense(inventory);
-  const scaffold = await scanScaffold(inventory, layout.templateGroups);
-  const testing = scanTesting(inventory);
+  const scaffold = await scanScaffold(inventory, layout.templateGroups, identity);
+  const testing = scanTesting(inventory, languages.languages);
   // The two reads past the tree, under ADR-0005.
   const commits = await scanCommits(root);
   const releases = await scanReleases(inventory);

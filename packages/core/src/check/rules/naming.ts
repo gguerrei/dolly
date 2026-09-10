@@ -3,6 +3,7 @@ import {
   dirsHoldingCode,
   extensionOf,
   isMandated,
+  isMandatedDir,
   normalizeStem,
   stylesMatching,
 } from "../../extract/naming";
@@ -52,7 +53,7 @@ export const namingRule: Rule = {
         if (dir === ".github" || dir.startsWith(".github/")) continue;
         if (codeDirs !== undefined && !codeDirs.has(dir)) continue;
         const base = dir.slice(dir.lastIndexOf("/") + 1);
-        if (base.startsWith(".")) continue;
+        if (isMandatedDir(base)) continue;
         const stem = normalizeStem(base);
         if (stem === "" || stylesMatching(stem).includes(naming.directories)) continue;
         violations.push({
