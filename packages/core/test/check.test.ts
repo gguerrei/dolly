@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { scaffoldProject } from "../src/apply/new";
 import { checkProject } from "../src/check/check";
@@ -10,8 +10,11 @@ import {
   ignorePaths,
   linkProject,
   type PatternRef,
+  pruneSources,
   readPatternMarker,
   resolvePattern,
+  SOURCE_TUNING,
+  SOURCES_DIR,
 } from "../src/marker";
 import { cleanupTempRoots, freshStore, repo, seed, tempDir } from "./support";
 
@@ -649,7 +652,7 @@ describe("checkProject", () => {
     expect(await readFile(join(project, ".dolly"), "utf8")).toBe("pattern: tidy\n");
   });
 
-  test("a bundle URL as the source is fetched into a temporary store for the run", async () => {
+  test("a bundle URL as the source is fetched under the dolly home, reused for an hour, and pruned", async () => {
     const store = await freshStore();
     await seed(store, { name: "tidy", layout: [{ path: "docs/", required: true }] });
     const bundle = await exportBundle(
@@ -657,21 +660,38 @@ describe("checkProject", () => {
       "tidy",
       join(await tempDir("dolly-bundle-"), "tidy.dolly"),
     );
+    let fetches = 0;
     const server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
-      fetch: () => new Response(Bun.file(bundle)),
+      fetch: () => {
+        fetches++;
+        return new Response(Bun.file(bundle));
+      },
     });
+    const outerHome = process.env.DOLLY_HOME;
+    const home = await tempDir("dolly-home-");
+    process.env.DOLLY_HOME = home;
     try {
       const url = `http://127.0.0.1:${server.port}/tidy.dolly`;
       const project = await repo({ ".dolly": `pattern: tidy\nsource: ${url}\n`, "docs/a.md": "" });
       const ref = (await resolvePattern(await freshStore(), project)) as PatternRef;
       expect(ref.name).toBe("tidy");
       expect(ref.store).not.toBe(store);
+      expect(ref.store.root.startsWith(join(home, SOURCES_DIR))).toBe(true);
       expect((await checkProject(ref.store, ref.name, project)).violations).toEqual([]);
+      // The hour's second check reads the copy; a stale stamp fetches again.
+      await resolvePattern(await freshStore(), project);
+      expect(fetches).toBe(1);
+      const stamp = join(ref.store.root, "..", "fetched");
+      const stale = new Date(Date.now() - SOURCE_TUNING.reuseMs - 1000);
+      await utimes(stamp, stale, stale);
+      await resolvePattern(await freshStore(), project);
+      expect(fetches).toBe(2);
       const wrong = await repo({ ".dolly": `pattern: other\nsource: ${url}\n` });
       await expect(resolvePattern(await freshStore(), wrong)).rejects.toThrow('holds "tidy"');
-      // A pin is honored: the right hash reads, any other refuses before unzipping.
+      // A pin is honored: the right hash reads, any other refuses before unzipping,
+      // and a changed pin is a new copy, never the old one read again.
       const digest = createHash("sha256")
         .update(await readFile(bundle))
         .digest("hex");
@@ -683,8 +703,16 @@ describe("checkProject", () => {
       await expect(resolvePattern(await freshStore(), swapped)).rejects.toThrow(
         "does not match the sha256",
       );
+      // Prune removes the copies older than a week, and says which URLs they held.
+      expect(await pruneSources()).toEqual([]);
+      const old = new Date(Date.now() - SOURCE_TUNING.staleMs - 1000);
+      await utimes(stamp, old, old);
+      expect(await pruneSources()).toEqual([url]);
+      expect(await Bun.file(stamp).exists()).toBe(false);
     } finally {
       server.stop(true);
+      if (outerHome === undefined) delete process.env.DOLLY_HOME;
+      else process.env.DOLLY_HOME = outerHome;
     }
   });
 

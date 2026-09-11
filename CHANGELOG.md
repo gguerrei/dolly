@@ -287,6 +287,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `{name}` group lists its eight best supported core paths and counts the
   rest in a note, so a module shape with many shared files cannot push the
   layout past its budget.
+- A marker's `source:` URL is fetched under the dolly home, one copy per URL
+  and pin, read again for an hour instead of fetched, and `dolly home
+  --prune` removes the copies older than a week.
 
 ### Changed
 
