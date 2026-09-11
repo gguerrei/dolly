@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -526,6 +527,20 @@ describe("dolly CLI", () => {
     for (let waited = 0; alive() && waited < 6000; waited += 250) await Bun.sleep(250);
     if (alive()) process.kill(pid); // never leave one behind, whatever the verdict
     expect(alive()).toBe(false);
+  });
+
+  test("import --sha256 reads a bundle only when its bytes hash to the pin", async () => {
+    await seedPattern("tidy", "---\nname: tidy\n---\n");
+    const out = join(home, "tidy.dolly");
+    expect((await dolly("export", "tidy", "--out", out)).exitCode).toBe(0);
+    const elsewhere = { DOLLY_HOME: join(home, "elsewhere") };
+    const swapped = await dollyWithEnv(elsewhere, "import", out, "--sha256", "0".repeat(64));
+    expect(swapped.exitCode).toBe(1);
+    expect(swapped.stderr).toContain("does not match the sha256");
+    const digest = createHash("sha256")
+      .update(await readFile(out))
+      .digest("hex");
+    expect((await dollyWithEnv(elsewhere, "import", out, "--sha256", digest)).exitCode).toBe(0);
   });
 
   test("check refuses --fix combined with --watch", async () => {

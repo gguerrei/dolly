@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { scaffoldProject } from "../src/apply/new";
@@ -670,6 +671,18 @@ describe("checkProject", () => {
       expect((await checkProject(ref.store, ref.name, project)).violations).toEqual([]);
       const wrong = await repo({ ".dolly": `pattern: other\nsource: ${url}\n` });
       await expect(resolvePattern(await freshStore(), wrong)).rejects.toThrow('holds "tidy"');
+      // A pin is honored: the right hash reads, any other refuses before unzipping.
+      const digest = createHash("sha256")
+        .update(await readFile(bundle))
+        .digest("hex");
+      const pinned = await repo({ ".dolly": `pattern: tidy\nsource: ${url}\nsha256: ${digest}\n` });
+      expect((await resolvePattern(await freshStore(), pinned))?.name).toBe("tidy");
+      const swapped = await repo({
+        ".dolly": `pattern: tidy\nsource: ${url}\nsha256: ${"ab".repeat(32)}\n`,
+      });
+      await expect(resolvePattern(await freshStore(), swapped)).rejects.toThrow(
+        "does not match the sha256",
+      );
     } finally {
       server.stop(true);
     }

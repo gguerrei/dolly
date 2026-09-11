@@ -24,7 +24,9 @@
     "dolly": "./dist/main.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.md"
   ],
   "engines": {
     "bun": ">=1.2"

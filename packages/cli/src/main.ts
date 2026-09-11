@@ -465,9 +465,13 @@ program
   .command("import")
   .argument("<source>", ".dolly bundle to import: a file path, or an https URL")
   .option("-f, --force", "replace an existing pattern with the same name")
+  .option("--sha256 <hex>", "read the bundle only if its bytes hash to this")
   .description("Add a shared .dolly bundle to your patterns.")
-  .action(async (source: string, options: { force?: boolean }) => {
-    const pattern = await importBundle(new PatternStore(), source, { force: options.force });
+  .action(async (source: string, options: { force?: boolean; sha256?: string }) => {
+    const pattern = await importBundle(new PatternStore(), source, {
+      force: options.force,
+      sha256: options.sha256,
+    });
     const description = pattern.description ? `: ${pattern.description}` : "";
     console.log(`Imported "${pattern.name}"${description}`);
   });
