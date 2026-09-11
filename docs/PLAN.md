@@ -108,6 +108,34 @@ dolly learn [pattern] [--once] [--yes] # watch a project, review drafted pattern
 - **M8: Exports** *(done 2026-08-22: engine, CLI, daemon, and the GUI's export view, designed on the canvas first)*. `claude-skill`, `cursor` rules, `AGENTS.md`, generic system prompt, one brief in four frames ([docs/design/exports.md](design/exports.md)). (Bundle import/export moved to M1.) Adds the facets exports feed on most: `commits` (message grammar voted from git log under [ADR-0005](adr/0005-history-facets.md), the exception to ADR-0003) and `releases` (versioning scheme, changelog style, release tool); `naming.branches` was deferred, since one clone's local refs are not evidence of a convention. Design step: the **export view** on the canvas (pick a target, preview the rendered file, save or copy), approved and ported the same day.
 - **M9: Going public & v0.1** *(the GUI's share done 2026-08-23: the native shell's pickers and the extract, new, import, and bundle export flows, designed on the canvas then ported; the release mechanics done 2026-09-10: the binary and the npm bundle embed the GUI, the Tauri shell spawns the compiled daemon as its sidecar, Windows keys seal through DPAPI, the format bump discipline is written down, and a tag builds the binaries, the installers and the npm package through [.github/workflows/release.yml](../.github/workflows/release.yml), with the steps in [docs/RELEASING.md](RELEASING.md); what remains is the maintainer's: the first public push, the v0.1.0 tag, the Homebrew tap, docs visuals)*. First public GitHub push, `bun build --compile` binaries (macOS/Linux/Windows), npm + Homebrew distribution, Tauri installers, docs polish, demo GIF, name-collision check on registries, v0.1.0 release. Design steps, each on the canvas first: the **native shell's directory pickers and the extract, new, import and export flows** they unlock (M5's debt), the **README and docs visuals** (hero, the demo's storyboard, social preview card), and the **installer and store assets** for the Tauri builds.
 
+## After v0.1: the gaps and their plans
+
+Six things the 2026-09-10 evaluation found missing and deliberately left for after the first release, each with the shape of its fix so a session can pick one up cold. Order is by value; none blocks going public.
+
+### The engine on npm (`@dollysheep/core`)
+
+Today `dollysheep` bundles the engine in, so nobody can `import { extractPattern } from "@dollysheep/core"`; editors and other tools have no door but the CLI and the daemon. Plan: a library build, `bun build --target=bun --packages=external packages/core/src/index.ts --outdir packages/core/dist` for the code and `tsc --emitDeclarationOnly` (a small tsconfig beside it) for the types; `exports` pointing at `dist/index.js` with `types`, `files: ["dist"]`, the runtime dependencies staying dependencies; the barrel stays the public API (it already is the one door, docs/design/gui.md). The release workflow publishes core before the CLI, RELEASING.md gains the step, and the CLI keeps bundling it so nothing at runtime couples the two. Acceptance: `bun add @dollysheep/core` in a scratch project, `extractPattern` runs on a fixture with types resolving. Half a day.
+
+### GUI tests in CI
+
+Only the markdown renderer has tests; the seven views were walked by hand. Plan: Playwright (`@playwright/test`, Chromium only) under `apps/desktop/e2e/`, a global setup that seeds a temp `DOLLY_HOME` with `dolly extract` on a fixture and starts `dolly serve --port 0`, and one spec per view opening the tokened URL and walking library → pattern (overview, source, a captured file tab) → check (run, ignore, fix) → fit (plan) → export (preview) → settings, asserting text and zero console errors, the same walk the sessions do by hand. CI's quality job runs it on Ubuntu after the webview build (`npx playwright install --with-deps chromium`). Acceptance: a broken view fails the job. A day; keep each spec short.
+
+### Editing the marker from the GUI and the CLI
+
+The check view adds an ignore but cannot remove one, and `rules` are hand-edited only. Plan: one engine function `editMarker(dir, { ignore?, rules? })` beside `ignorePaths` (which becomes a call to it), `dolly ignore --remove <paths...>` and a small `dolly rules <rule>=<on|warn|off>` verb, `POST /api/marker` carrying the whole marker, and a Marker panel under the check view's toolbar (the ignore entries with a remove action, the ten rules as a three-state row), a board first since it is a new panel. Acceptance: the marker round-trips through the panel, check re-runs after each change, the verbs write the same bytes. A day including the board.
+
+### The layout budget and required entries
+
+The 50-entry budget drops optional entries only, so a `{name}` group with many required core files pushes a pattern past it (Humanizer: 98 after the identity fix). Plan: budget a group's core too, keeping its first N core entries by support then path (N = 8, a `LAYOUT_TUNING` constant) and turning the rest into one counted note ("12 more files every member carries; add them by hand"); check and new read the same entries, so nothing else moves. Acceptance: Humanizer's pattern fits the budget, and `layout.test.ts` pins the group cap. Two hours.
+
+### Toolchain detection below the root
+
+A repository of samples or a monorepo without a root manifest (ktor-samples) extracts as whatever language dominates by bytes and scaffolds a JavaScript project. Plan: when the root carries no manifest, run the toolchain fingerprints over the workspace members or the first-level directories that carry one and vote, with `agreement.ts`'s machinery applied to subtrees: a tool a majority of members share becomes the facet, the note names the members that disagree, and the primary ecosystem follows the same vote; `new` then refuses to invent a root manifest for a pattern whose ecosystem came from members, and says so. Acceptance: ktor-samples extracts `toolchain.packageManager: gradle` and its scaffold carries no `package.json`. A day.
+
+### Pruning the URL-source stores
+
+A pattern fetched for a `source:` URL lands under the system temp directory once per URL and is never removed. Plan: keep the stores under `<dollyHome>/sources/<hash>` with a fetched-at stamp, reuse a copy younger than an hour and refetch otherwise (a `sha256:` pin makes the reuse safe), and give `dolly home` a `--prune` that removes sources older than a week. Acceptance: two checks in a row fetch once, and `dolly home --prune` empties the directory. Two hours.
+
 ## Risks
 
 | Risk | Mitigation |
