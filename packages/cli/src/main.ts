@@ -35,6 +35,7 @@ import {
   type Proposal,
   parsePatternDocument,
   pathLabel,
+  pruneSources,
   renderExport,
   renderProposal,
   resolvePattern,
@@ -579,9 +580,20 @@ program
 
 program
   .command("home")
+  .option(
+    "--prune",
+    "remove the bundles fetched for markers' source URLs that are older than a week",
+  )
   .description("Print where dolly stores its data on this machine.")
-  .action(() => {
+  .action(async (options: { prune?: boolean }) => {
     console.log(dollyHome());
+    if (!options.prune) return;
+    const removed = await pruneSources();
+    console.log(
+      removed.length === 0
+        ? "No fetched sources older than a week."
+        : `Removed ${removed.length} fetched source${removed.length === 1 ? "" : "s"}: ${removed.join(", ")}.`,
+    );
   });
 
 /** How much of a fix's patch the dry run prints before cutting it short. */

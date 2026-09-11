@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
-import { cp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { cp, readdir, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
 import { RULE_IDS, type RuleId } from "./check/rule";
 import { importBundle } from "./export/bundle";
 import { isSafePatternPath, patternSchema } from "./pattern/schema";
-import { PatternStore } from "./store";
+import { dollyHome, PatternStore } from "./store";
 
 /**
  * The `.dolly` marker: a committed YAML file linking a project to its
@@ -25,6 +24,16 @@ export const MARKER_FILE = ".dolly";
 
 /** Where `dolly link --vendor` puts the pattern: the store's own layout, under the project root. */
 export const VENDOR_DIR = "dolly";
+
+/** Where the bundles a marker's `source` URL names are kept between runs, under the dolly home. */
+export const SOURCES_DIR = "sources";
+
+export const SOURCE_TUNING = {
+  /** A fetched copy younger than this is read again instead of fetched again. */
+  reuseMs: 60 * 60 * 1000,
+  /** `dolly home --prune` removes copies older than this. */
+  staleMs: 7 * 24 * 60 * 60 * 1000,
+};
 
 export type RuleSetting = "off" | "warn";
 
@@ -115,8 +124,9 @@ export interface PatternRef {
  * Where a project's pattern lives. An explicit name beats the marker and
  * reads from the machine's store; a marker without `source` does the same;
  * a `source` directory is read as a store rooted there, and a `source` URL
- * is fetched into a temporary store for this run under the same caps as
- * `dolly import`. Undefined when nothing names a pattern.
+ * is fetched under the dolly home under the same caps as `dolly import`,
+ * a copy younger than an hour read again instead. Undefined when nothing
+ * names a pattern.
  */
 export async function resolvePattern(
   store: PatternStore,
@@ -133,10 +143,26 @@ export async function resolvePattern(
       name: marker.pattern,
     };
   }
-  const fetched = new PatternStore(
-    join(tmpdir(), "dolly-sources", createHash("sha256").update(marker.source).digest("hex")),
-  );
-  const { name } = await importBundle(fetched, marker.source, {
+  return { store: await fetchedSource(marker), name: marker.pattern };
+}
+
+/**
+ * The store a `source` URL is fetched into: one directory per URL and pin
+ * under `<home>/sources/`, stamped with the time of the fetch, so the
+ * hour's checks read one fetch and a changed pin never reads an old copy.
+ */
+async function fetchedSource(marker: Marker): Promise<PatternStore> {
+  const key = createHash("sha256")
+    .update(`${marker.source}\n${marker.sha256 ?? ""}`)
+    .digest("hex");
+  const dir = join(dollyHome(), SOURCES_DIR, key);
+  const store = new PatternStore(join(dir, "patterns"));
+  const stamp = join(dir, "fetched");
+  const age = await ageOf(stamp);
+  if (age !== undefined && age <= SOURCE_TUNING.reuseMs && (await store.has(marker.pattern))) {
+    return store;
+  }
+  const { name } = await importBundle(store, marker.source as string, {
     force: true,
     ...(marker.sha256 ? { sha256: marker.sha256 } : {}),
   });
@@ -145,7 +171,30 @@ export async function resolvePattern(
       `${MARKER_FILE} names "${marker.pattern}", but the bundle at ${marker.source} holds "${name}".`,
     );
   }
-  return { store: fetched, name };
+  await Bun.write(stamp, `${marker.source}\n`);
+  return store;
+}
+
+/** `dolly home --prune`: removes the fetched sources older than a week, and returns their URLs. */
+export async function pruneSources(): Promise<string[]> {
+  const root = join(dollyHome(), SOURCES_DIR);
+  const removed: string[] = [];
+  for (const entry of await readdir(root).catch(() => [] as string[])) {
+    const stamp = join(root, entry, "fetched");
+    const age = await ageOf(stamp);
+    if (age !== undefined && age <= SOURCE_TUNING.staleMs) continue;
+    // No stamp means a fetch that never finished: gone too, named by its directory.
+    const url = age === undefined ? entry : (await Bun.file(stamp).text()).trim();
+    await rm(join(root, entry), { recursive: true, force: true });
+    removed.push(url);
+  }
+  return removed.sort();
+}
+
+/** Milliseconds since the file was last written, undefined without the file. */
+async function ageOf(path: string): Promise<number | undefined> {
+  const info = await stat(path).catch(() => undefined);
+  return info && Date.now() - info.mtimeMs;
 }
 
 /**

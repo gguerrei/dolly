@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,10 +90,24 @@ describe("dolly CLI", () => {
     expect(stderr).toContain('No saved pattern named "nope"');
   });
 
-  test("home prints the data root, honoring DOLLY_HOME", async () => {
+  test("home prints the data root, honoring DOLLY_HOME, and --prune removes week-old sources", async () => {
     const { stdout, exitCode } = await dolly("home");
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(home);
+    const fresh = join(home, "sources", "fresh");
+    const stale = join(home, "sources", "stale");
+    for (const dir of [fresh, stale]) await mkdir(dir, { recursive: true });
+    await writeFile(join(fresh, "fetched"), "https://example.test/fresh.dolly\n");
+    await writeFile(join(stale, "fetched"), "https://example.test/stale.dolly\n");
+    const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await utimes(join(stale, "fetched"), old, old);
+    const pruned = await dolly("home", "--prune");
+    expect(pruned.stdout).toContain("Removed 1 fetched source: https://example.test/stale.dolly.");
+    expect(await Bun.file(join(fresh, "fetched")).exists()).toBe(true);
+    expect(await Bun.file(join(stale, "fetched")).exists()).toBe(false);
+    expect((await dolly("home", "--prune")).stdout).toContain(
+      "No fetched sources older than a week.",
+    );
   });
 
   test("edit validates the file the editor saved", async () => {

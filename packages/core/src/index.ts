@@ -89,6 +89,7 @@ export {
   type Marker,
   MarkerError,
   type PatternRef,
+  pruneSources,
   type RuleSetting,
   readMarker,
   readPatternMarker,
