@@ -27,8 +27,8 @@
     "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.9.6",
     "@vitejs/plugin-vue": "^6.0.0",
-    "typescript": "^5.8.0",
-    "vite": "^7.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
     "vue-tsc": "^3.0.0"
   }
 }

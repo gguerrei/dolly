@@ -36,6 +36,6 @@
   },
   "devDependencies": {
     "@dollysheep/core": "workspace:*",
-    "commander": "^14.0.0"
+    "commander": "^15.0.0"
   }
 }
