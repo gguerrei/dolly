@@ -476,8 +476,12 @@ program
   .command("serve")
   .option("-p, --port <port>", "port to listen on (0 for an ephemeral one)", String(DEFAULT_PORT))
   .option("--open", "open the GUI in your browser")
+  .option(
+    "--exit-with-parent",
+    "stop when the process that started this one is gone (the native shell passes it)",
+  )
   .description("Run the local daemon: browse, edit, and check patterns in the GUI.")
-  .action(async (options: { port: string; open?: boolean }) => {
+  .action(async (options: { port: string; open?: boolean; exitWithParent?: boolean }) => {
     const port = Number(options.port);
     if (!Number.isInteger(port) || port < 0 || port > 65535) {
       throw new Error(`"${options.port}" is not a port (0 to 65535).`);
@@ -489,8 +493,26 @@ program
     }
     console.log("Keep that URL to yourself: the token in it is this run's key. ctrl-c to stop.");
     if (options.open) openUrl(server.url);
+    // A daemon must never outlive the window that spawned it, however that
+    // window went: an orphan re-parents to init, or its parent's pid dies.
+    if (options.exitWithParent) {
+      const parent = process.ppid;
+      setInterval(() => {
+        if (process.ppid !== parent || !alive(parent)) process.exit(0);
+      }, 1000);
+    }
     await new Promise(() => {}); // serves until interrupted
   });
+
+/** Whether a process still exists: signal 0 asks without touching it. */
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const ai = program
   .command("ai")

@@ -220,6 +220,9 @@ by Tauri. Since 2026-09-10 the daemon is the shell's sidecar: `tauri build`
 first compiles dolly with the GUI embedded (`packages/cli/scripts/build-sidecar.ts`,
 `externalBin` in `tauri.conf.json`), Tauri bundles that binary beside the
 app's own executable, and `lib.rs` spawns it, falling back to `bun dolly
-serve` from the checkout only while developing (`tauri dev`). Prerequisites
+serve` from the checkout only while developing (`tauri dev`). Either way
+the shell passes `--exit-with-parent`, and the daemon polls for its parent
+once a second and stops when it is gone, so a window closed by a signal (which
+never reaches Tauri's exit event) leaves no daemon behind. Prerequisites
 and commands live in `apps/desktop/README.md`; the release steps in
 `docs/RELEASING.md`.

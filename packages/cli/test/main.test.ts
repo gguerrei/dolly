@@ -502,6 +502,32 @@ describe("dolly CLI", () => {
     expect(watched.stderr).toContain("do not combine");
   });
 
+  test("serve --exit-with-parent stops once the process that started it is gone", async () => {
+    // A throwaway parent starts the daemon, prints its pid, and exits at once.
+    const parent = Bun.spawn(
+      [
+        "bun",
+        "-e",
+        `const d = Bun.spawn(["bun", ${JSON.stringify(CLI)}, "serve", "--port", "0", "--exit-with-parent"], { stdout: "ignore", stderr: "ignore" }); console.log(d.pid); process.exit(0);`,
+      ],
+      { cwd: home, env: { ...process.env, DOLLY_HOME: home }, stdout: "pipe" },
+    );
+    const pid = Number((await new Response(parent.stdout).text()).trim());
+    expect(pid).toBeGreaterThan(0);
+    const alive = (): boolean => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    // The daemon polls once a second; give it a few before calling it stuck.
+    for (let waited = 0; alive() && waited < 6000; waited += 250) await Bun.sleep(250);
+    if (alive()) process.kill(pid); // never leave one behind, whatever the verdict
+    expect(alive()).toBe(false);
+  });
+
   test("check refuses --fix combined with --watch", async () => {
     await seedPattern("tidy", "---\nname: tidy\n---\n");
     const { stderr, exitCode } = await dolly("check", "tidy", "--fix", "--watch");
