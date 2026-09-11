@@ -26,7 +26,9 @@ the maintainer's hands.
   notices into `dist/`, which is the package: it publishes from there, so the
   source manifest keeps pointing at `src/` for the monorepo. The CLI bundles
   the engine in, so nothing at runtime couples the two packages.
-- **The desktop installers** (`.dmg`, `.deb`, `.AppImage`, `.msi`): `bun run
+- **The desktop installers** (`.dmg`, `.deb`, `.rpm`, `.msi`; no AppImage yet, since
+  linuxdeploy fails on the GitHub runner three ways into it, and a
+  `--verbose` run there is the next step for whoever wants one): `bun run
   tauri build` in `apps/desktop`. Its `beforeBuildCommand` builds the webview
   and `packages/cli/scripts/build-sidecar.ts`, which compiles the binary as
   `src-tauri/binaries/dolly-<host triple>`; Tauri bundles it beside the app

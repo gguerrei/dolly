@@ -17,7 +17,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg", "deb", "rpm", "nsis", "msi"],
     "externalBin": ["binaries/dolly"],
     "resources": {
       "../../../LICENSE": "LICENSE",
