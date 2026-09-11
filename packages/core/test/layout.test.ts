@@ -210,4 +210,26 @@ describe("the entry budget", () => {
     expect(paths(scan)).toContain("src/");
     expect(paths(scan)).toContain("README.md");
   });
+
+  test("a {name} group lists its best supported core paths and counts the rest in a note", async () => {
+    const members = ["a", "b", "c", "d"];
+    const shared = Array.from({ length: 12 }, (_, i) => `page${String(i).padStart(2, "0")}.md`);
+    const inv = await inventory(
+      ["docs", ...members.map((m) => `docs/${m}`)],
+      members.flatMap((m) => [
+        ...shared.map((file) => `docs/${m}/${file}`),
+        // A path three members carry is core, but ranks below the twelve every member does.
+        ...(m === "d" ? [] : [`docs/${m}/extra.md`]),
+      ]),
+    );
+    const scan = await scanLayout(inv, new Set());
+    const core = paths(scan).filter((p) => p.startsWith("docs/{name}/") && p !== "docs/{name}/");
+    expect(core.length).toBe(LAYOUT_TUNING.groupCoreCap);
+    expect(core).not.toContain("docs/{name}/extra.md");
+    expect(scan.notes.join("\n")).toContain(
+      `docs/{name}/ members share 5 more paths than the ${LAYOUT_TUNING.groupCoreCap} listed (page08.md, page09.md, page10.md, …)`,
+    );
+    // The scaffold scanner sees the same cap: no template group for a dropped path.
+    expect(scan.templateGroups.map((g) => g.target)).not.toContain("docs/{name}/page11.md");
+  });
 });

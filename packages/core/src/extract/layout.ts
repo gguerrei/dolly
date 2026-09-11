@@ -22,6 +22,8 @@ export const LAYOUT_TUNING = {
   entryBudget: 50,
   /** Sibling support ratio for template-core paths. */
   coreRatio: [6, 10] as const,
+  /** Core paths listed per {name} group; the rest become one counted note. */
+  groupCoreCap: 8,
 };
 
 /**
@@ -366,9 +368,22 @@ function voteDirGroup(
 
   const base = parent === "" ? "{name}" : `${parent}/{name}`;
   const memberNames = members.map(basenameOf).sort().slice(0, 4).join(", ");
+  // A group's core is budgeted too, best supported first: a module shape
+  // with dozens of shared files (every member's docs pages) would otherwise
+  // crowd out the rest of the tree, since required entries never drop.
+  const ranked = core.sort(
+    (a, b) => (support.get(b) ?? 0) - (support.get(a) ?? 0) || comparePaths(a, b),
+  );
+  const listed = ranked.slice(0, LAYOUT_TUNING.groupCoreCap);
+  const rest = ranked.slice(listed.length);
+  if (rest.length > 0) {
+    notes.push(
+      `${base}/ members share ${rest.length} more path${rest.length === 1 ? "" : "s"} than the ${listed.length} listed (${rest.slice(0, 3).join(", ")}${rest.length > 3 ? ", …" : ""}); add them by hand if wanted.`,
+    );
+  }
   const entries: LayoutEntry[] = [
     { path: `${base}/`, required: false, description: `generalized from ${memberNames}` },
-    ...core.sort(comparePaths).map((path) => ({
+    ...listed.sort(comparePaths).map((path) => ({
       path: `${base}/${path}`,
       required: (support.get(path) ?? 0) === members.length,
     })),

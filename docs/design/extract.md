@@ -83,7 +83,11 @@ Three evidence classes decide structural vs incidental:
 
 Files are incidental by default: only anchors, toolchain-claimed configs, and
 template cores are listed. That rule, not the entry budget (50), is the primary
-size bound. `required: true` demands corroboration: a known root-vocabulary
+size bound. A group's core is budgeted too (2026-09-11): the eight best
+supported paths are listed and the rest become one counted note, since a
+module shape whose members share dozens of files (every sample's docs pages)
+would otherwise push the whole layout past the budget with entries the
+budget never drops, being required. `required: true` demands corroboration: a known root-vocabulary
 name, workspace evidence, `.gitkeep`, or unanimous template support; one
 example repo alone never justifies requiring a path. Near-miss groups degrade
 to counted prose notes with a paste-ready path.
@@ -336,7 +340,8 @@ the extractor writes them as prose observations instead).
 
 All tunables live in one exported const per scanner so behavior changes are
 visible diffs. Current values (naming 80% / sample ≥ 5; layout MIN_GROUP 3,
-support 60%, depth cap 4, entry budget 50; toolchain capture cap 256 KiB;
+support 60%, depth cap 4, entry budget 50, 8 core paths per {name} group;
+toolchain capture cap 256 KiB;
 languages 1% share, natural-language 512 chars / 0.8 agreement; dependencies
 2/3 supermajority; testing 80% / sample ≥ 2; commits 80% / sample ≥ 10 over
 the last 200, note at 50%, a type at 2 sightings; releases 80% / tags ≥ 3)

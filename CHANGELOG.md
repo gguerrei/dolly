@@ -284,6 +284,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bun run version:set <version>` writes the version into every file that
   carries one, and `bun run version:check` (run by CI) fails when they
   disagree.
+- A `{name}` group lists its eight best supported core paths and counts the
+  rest in a note, so a module shape with many shared files cannot push the
+  layout past its budget.
 
 ### Changed
 
