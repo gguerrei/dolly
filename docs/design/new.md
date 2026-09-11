@@ -49,7 +49,9 @@ M3; reviewed by a five-dimension adversarial audit (2026-07-24).
 - **Base manifest.** package.json / pyproject.toml / Cargo.toml / go.mod, and
   since 2026-09-01 a Gemfile, a pom.xml (or build.gradle.kts with its
   settings file when the pattern says Gradle), a composer.json, or a .csproj
-  named after the project, with name, 0.1.0, the license id, runtime pins
+  named after the project (none at all, said in a note, when the layout
+  places the manifest inside a `{name}` group and not at the root: each
+  member carries its own), with name, 0.1.0, the license id, runtime pins
   (engines, requires-python, rust-version, `ruby`, the Java release, the PHP
   floor, the .NET target framework from the SDK pin), and the commands facet
   as scripts, or as a justfile/Makefile when that is the pattern's task

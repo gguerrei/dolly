@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { scaffoldProject, TargetNotEmptyError } from "../src/apply/new";
 import { checkProject } from "../src/check/check";
 import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
+import { ecosystemOfPattern } from "../src/extract/registry";
 import { isSafePatternPath, patternSchema } from "../src/pattern/schema";
 import { cleanupTempRoots, freshStore, repo, seed, tempDir } from "./support";
 
@@ -229,6 +230,55 @@ describe("scaffoldProject", () => {
       'git add -A && git commit -m "scaffold"',
     ]);
     expect((await checkProject(store, "shop", target)).violations).toEqual([]);
+  });
+
+  test("a tree of samples with no root manifest scaffolds its members' ecosystem, with no manifest at the root", async () => {
+    // Three Gradle samples and one npm sample; the npm one carries the most bytes,
+    // so the languages vote alone would call this a TypeScript tree.
+    const gradle = (name: string): Record<string, string> => ({
+      [`${name}/build.gradle.kts`]:
+        'plugins { kotlin("jvm") }\ndependencies { testImplementation("org.junit.jupiter:junit-jupiter") }\n',
+      [`${name}/settings.gradle.kts`]: `rootProject.name = "${name}"\n`,
+      [`${name}/src/main/kotlin/App.kt`]: "fun main() {}\n",
+      [`${name}/src/test/kotlin/AppTest.kt`]: "class AppTest\n",
+    });
+    const source = await repo({
+      "README.md": "# samples\n",
+      ".github/workflows/ci.yml": "on: push\n",
+      ...gradle("chat"),
+      ...gradle("auth"),
+      ...gradle("files"),
+      "web/package.json": JSON.stringify({ name: "web", scripts: { test: "bun test" } }),
+      "web/bun.lock": "{}",
+      "web/src/index.ts": `export const big = "${"x".repeat(4000)}";\n`,
+      "web/src/index.test.ts": "",
+    });
+    const store = await freshStore();
+    const { document } = await extractPattern(source, "samples");
+    await saveExtractedPattern(store, { document, files: {} });
+    const { pattern } = document;
+    expect(pattern.languages?.programming[0]).toBe("TypeScript");
+    expect(pattern.toolchain?.packageManager).toBe("gradle");
+    expect(pattern.toolchain?.testRunner).toBe("junit");
+    expect(pattern.toolchain?.ci).toBe("github-actions");
+    expect(pattern.toolchain?.configs).toEqual({});
+    expect(ecosystemOfPattern(pattern)).toBe("maven");
+    expect(document.prose).toContain(
+      "No manifest at the root, so the toolchain is what a majority of the 4 members carrying one agree on (auth, chat, files, web).",
+    );
+    expect(document.prose).toContain("packageManager: gradle (3 of 4 members); web says bun.");
+    expect(document.prose).toContain("ecosystem: maven (3 of 4 members); web says npm.");
+    expect(pattern.layout.map((e) => e.path)).toContain("{name}/build.gradle.kts");
+
+    const target = join(await tempDir("dolly-new-target-"), "my-samples");
+    const report = await scaffoldProject(store, "samples", target);
+    expect(await exists(join(target, "package.json"))).toBe(false);
+    expect(await exists(join(target, "build.gradle.kts"))).toBe(false);
+    expect(await exists(join(target, "my-samples", "build.gradle.kts"))).toBe(true);
+    expect(report.notes.join("\n")).toContain(
+      "The manifest lives in each member ({name}/build.gradle.kts), so none was written at the root",
+    );
+    expect((await checkProject(store, "samples", target)).violations).toEqual([]);
   });
 
   test("refuses a non-empty target directory", async () => {

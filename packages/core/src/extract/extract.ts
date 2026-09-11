@@ -1,7 +1,7 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import type { PatternDocument } from "../pattern/document";
-import { type Pattern, slugify } from "../pattern/schema";
+import { type Pattern, slugify, type Toolchain } from "../pattern/schema";
 import type { PatternStore } from "../store";
 import { collectInventory, rootFiles } from "../tree/inventory";
 import { agreePatterns } from "./agreement";
@@ -12,12 +12,14 @@ import { projectIdentity } from "./identity";
 import { scanLanguages } from "./languages";
 import { scanLayout } from "./layout";
 import { scanLicense } from "./license";
+import type { MembersScan } from "./members";
+import { scanMembers } from "./members";
 import { scanNaming } from "./naming";
 import { ecosystemOf } from "./registry";
 import { scanReleases } from "./releases";
 import { scanScaffold } from "./scaffold";
 import { scanTesting } from "./testing";
-import { scanToolchain } from "./toolchain";
+import { scanToolchain, type ToolchainScan } from "./toolchain";
 
 /**
  * The extract orchestrator: one shared inventory feeds the scanners, facets
@@ -72,8 +74,11 @@ async function extractRepo(repoPath: string, name?: string): Promise<RepoExtract
   const languages = await scanLanguages(inventory);
   // One primary ecosystem per repo, shared by toolchain and dependencies so
   // their facets can never disagree, and shared with `new` (see registry).
-  const primary = ecosystemOf(languages.languages?.programming ?? [], rootFiles(inventory));
-  const toolchain = await scanToolchain(inventory, primary);
+  // A root without a manifest defers to its members' vote (members.ts).
+  const members = await scanMembers(inventory);
+  const primary =
+    members?.primary ?? ecosystemOf(languages.languages?.programming ?? [], rootFiles(inventory));
+  const toolchain = withMembers(await scanToolchain(inventory, primary), members);
   const dependencies = await scanDependencies(inventory, toolchain.toolchain, primary);
   const claimedConfigs = new Set(
     Object.keys(toolchain.toolchain?.configs ?? {}).map(
@@ -130,6 +135,25 @@ async function extractRepo(repoPath: string, name?: string): Promise<RepoExtract
       files: { ...toolchain.files, ...scaffold.files },
     },
     sections,
+  };
+}
+
+/** The root's own toolchain (its CI, hooks, taskfile) with the members' vote filling the roles it cannot see. */
+function withMembers(root: ToolchainScan, members: MembersScan | undefined): ToolchainScan {
+  if (!members) return root;
+  const toolchain: Toolchain | undefined =
+    members.toolchain || root.toolchain
+      ? {
+          ...members.toolchain,
+          ...root.toolchain,
+          configs: root.toolchain?.configs ?? {},
+          binding: root.toolchain?.binding ?? {},
+        }
+      : undefined;
+  return {
+    ...(toolchain ? { toolchain } : {}),
+    files: root.files,
+    notes: [...root.notes, ...members.notes],
   };
 }
 

@@ -2,7 +2,12 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { LICENSE_FILE } from "../extract/license";
 import { extensionOf, renderStem } from "../extract/naming";
-import { type Ecosystem, ecosystemOfPattern, MANIFEST_OF } from "../extract/registry";
+import {
+  type Ecosystem,
+  ecosystemOfPattern,
+  isManifestName,
+  MANIFEST_OF,
+} from "../extract/registry";
 import { TEST_ROOT_NAMES } from "../extract/testing";
 import { markerContents } from "../marker";
 import { isSafePatternPath, type Pattern, slugify } from "../pattern/schema";
@@ -148,7 +153,23 @@ export async function scaffoldProject(
   }
 
   // --- Base manifest + embed targets ---------------------------------------
-  const manifestPath = ecosystem ? manifestPathOf(ecosystem, pattern, projectName) : undefined;
+  // A manifest the layout places inside a {name} group, with none at the
+  // root, is each member's own (a tree of samples, a monorepo whose members
+  // carry theirs): the root gets none, and the report says so.
+  const memberManifest = pattern.layout.find(
+    (entry) => entry.path.includes("{name}/") && isManifestName(basename(entry.path)),
+  );
+  const rootManifest = pattern.layout.some(
+    (entry) => !entry.path.includes("/") && isManifestName(entry.path),
+  );
+  const manifestPerMember = memberManifest !== undefined && !rootManifest;
+  if (manifestPerMember) {
+    notes.push(
+      `The manifest lives in each member (${memberManifest.path}), so none was written at the root; add members carrying their own.`,
+    );
+  }
+  const manifestPath =
+    ecosystem && !manifestPerMember ? manifestPathOf(ecosystem, pattern, projectName) : undefined;
   if (ecosystem === "maven" && manifestPath === "build.gradle.kts") {
     files.set("settings.gradle.kts", `rootProject.name = "${projectName}"\n`);
   }

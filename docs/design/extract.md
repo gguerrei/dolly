@@ -149,6 +149,22 @@ The matrix is seeded with the per-ecosystem head (~the top tools you'd
 actually meet) and grows from evidence; a missing row degrades to a prose
 note, never a wrong facet.
 
+A root without a manifest (2026-09-11: a tree of samples, a monorepo whose
+members carry their own) is read through its members: every first-level
+directory carrying a manifest is scanned with the same fingerprints over
+the same inventory narrowed to it (`extract/members.ts`), and for each role
+the tool a majority of them share becomes the facet, the members that
+disagree named in a note; the primary ecosystem follows the same vote, so
+the tree's toolchain is Gradle even where a vendored bundle makes
+JavaScript dominate its bytes. Only roles travel: a member's captured
+config lives under the member, where the root pattern's config rule would
+never find it. The root's own toolchain (its CI, hooks, taskfile) still
+wins for the roles it can see. A pattern's ecosystem is then read from its
+package manager first (`ecosystemOfPattern`), the languages deciding only
+when there is none, and `new` writes no manifest at the root of a pattern
+whose layout places the manifest inside a `{name}` group with none at the
+root, saying so in its notes.
+
 ### Dependencies
 
 Manifests parsed: package.json (+ workspaces), pyproject.toml

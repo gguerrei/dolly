@@ -147,6 +147,23 @@ export async function collectInventory(root: string): Promise<Inventory> {
   return { root, files, dirs, vendored, denied, lockfiles };
 }
 
+/** The inventory of one directory inside another's, paths made relative to it: the same eyes, narrowed. */
+export function subInventory(inventory: Inventory, dir: string): Inventory {
+  const prefix = `${dir}/`;
+  const inside = (path: string) => path.startsWith(prefix);
+  const strip = (path: string) => path.slice(prefix.length);
+  return {
+    root: join(inventory.root, dir),
+    files: inventory.files
+      .filter((f) => inside(f.path))
+      .map((f) => ({ ...f, path: strip(f.path) })),
+    dirs: inventory.dirs.filter(inside).map(strip),
+    vendored: inventory.vendored.filter(inside).map(strip),
+    denied: inventory.denied.filter(inside).map(strip),
+    lockfiles: inventory.lockfiles.filter(inside).map(strip),
+  };
+}
+
 /**
  * The shared "evidence files at repo root" view scanners key decisions on.
  * Lockfiles are deliberately excluded: they are toolchain-only evidence,
