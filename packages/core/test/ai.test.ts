@@ -497,3 +497,16 @@ describe("the conventions check", () => {
     expect(body.messages[0]?.content).not.toContain("--- src/domain.ts"); // unchanged since HEAD
   });
 });
+
+describe.skipIf(process.platform !== "win32")("keys on windows", () => {
+  test("a key seals through DPAPI into dolly's home and reads back, never as plaintext", async () => {
+    process.env.DOLLY_HOME = await mkdtemp(join(tmpdir(), "dolly-dpapi-"));
+    await storeKey("openai", "sk-sealed-key");
+    expect(await findKey("openai")).toEqual({ key: "sk-sealed-key", source: "keychain" });
+    const sealed = await readFile(join(process.env.DOLLY_HOME, "keys", "openai.dpapi"));
+    expect(sealed.length).toBeGreaterThan(0);
+    expect(sealed.toString("latin1")).not.toContain("sk-sealed-key");
+    await storeKey("openai", "sk-replaced");
+    expect((await findKey("openai"))?.key).toBe("sk-replaced");
+  });
+});

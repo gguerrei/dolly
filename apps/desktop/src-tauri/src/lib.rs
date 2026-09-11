@@ -4,6 +4,7 @@
 //! the webview there; closing the app takes the daemon down with it.
 
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
@@ -11,12 +12,33 @@ use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 struct Daemon(Mutex<Option<Child>>);
 
 /// src-tauri sits at apps/desktop/src-tauri; the workspace root is three up.
-fn repo_root() -> std::path::PathBuf {
+fn repo_root() -> PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(3)
         .expect("workspace root above src-tauri")
         .to_path_buf()
+}
+
+/// The compiled daemon bundled beside the app (Tauri's sidecar, `externalBin` in
+/// tauri.conf.json), or `bun dolly serve` from the checkout while developing.
+fn daemon() -> Command {
+    let sidecar = std::env::current_exe().ok().and_then(|exe| {
+        let name = if cfg!(windows) { "dolly.exe" } else { "dolly" };
+        exe.parent().map(|dir| dir.join(name))
+    });
+    match sidecar.filter(|path| path.is_file()) {
+        Some(path) => {
+            let mut command = Command::new(path);
+            command.args(["serve", "--port", "0"]);
+            command
+        }
+        None => {
+            let mut command = Command::new("bun");
+            command.args(["dolly", "serve", "--port", "0"]).current_dir(repo_root());
+            command
+        }
+    }
 }
 
 pub fn run() {
@@ -25,12 +47,10 @@ pub fn run() {
         // the daemon stays the only door to the engine.
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let mut child = Command::new("bun")
-                .args(["dolly", "serve", "--port", "0"])
-                .current_dir(repo_root())
+            let mut child = daemon()
                 .stdout(Stdio::piped())
                 .spawn()
-                .expect("spawn `bun dolly serve` (is bun on the PATH?)");
+                .expect("spawn the dolly daemon (the sidecar, or bun on the PATH)");
             let stdout = child.stdout.take().expect("daemon stdout");
             // First line: "dolly is serving at http://127.0.0.1:<port>/#token=…"
             let url = BufReader::new(stdout)

@@ -1,6 +1,6 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
-import { type Pattern, patternSchema } from "./schema";
+import { PATTERN_FORMAT, type Pattern, patternSchema } from "./schema";
 
 /**
  * A pattern on disk is a Markdown document: YAML frontmatter holds the facets
@@ -38,6 +38,16 @@ export function parsePatternDocument(source: string): PatternDocument {
     throw new PatternParseError(`Frontmatter is not valid YAML: ${(cause as Error).message}`);
   }
 
+  // A format this dolly does not know is said outright, before the schema's
+  // word-for-word complaint: the fix is a newer dolly, or a re-extraction.
+  const format = (facets as { format?: unknown } | null)?.format;
+  if (format !== undefined && format !== PATTERN_FORMAT) {
+    throw new PatternParseError(
+      typeof format === "number" && format > PATTERN_FORMAT
+        ? `This pattern is format ${format}, written by a newer dolly than this one (format ${PATTERN_FORMAT}); upgrade dolly to read it.`
+        : `This pattern says format ${JSON.stringify(format)}, which this dolly does not read (it reads format ${PATTERN_FORMAT}); re-extract it, or set format: ${PATTERN_FORMAT} if the facets still fit.`,
+    );
+  }
   const parsed = patternSchema.safeParse(facets);
   if (!parsed.success) {
     throw new PatternParseError(`Invalid pattern facets:\n${z.prettifyError(parsed.error)}`);

@@ -14,7 +14,7 @@ const outerHome = process.env.DOLLY_HOME;
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "dolly-serve-"));
   process.env.DOLLY_HOME = home; // the AI switch reads its settings from here
-  server = serveDolly({
+  server = await serveDolly({
     port: 0,
     store: new PatternStore(join(home, "patterns")),
     uiDir: join(home, "no-ui"), // hermetic: never pick up the repo's real build
@@ -673,7 +673,7 @@ describe("dolly serve", () => {
     await writeFile(join(ui, "assets", "app.js"), "console.log('dolly');\n");
     await writeFile(join(home, "secret.txt"), "not served\n");
 
-    const withUi = serveDolly({
+    const withUi = await serveDolly({
       port: 0,
       store: new PatternStore(join(home, "patterns")),
       uiDir: ui,

@@ -88,21 +88,31 @@ export interface DollyServer {
   stop(): void;
 }
 
-// In a repo checkout the built webview sits beside the packages; the M9
-// compiled binary will embed it instead.
+// In a repo checkout the built webview sits beside the packages; a compiled
+// or bundled dolly carries it embedded instead (packages/cli/scripts/embed-ui.ts).
 const UI_DIST = join(import.meta.dir, "..", "..", "..", "apps", "desktop", "dist");
 
-export function serveDolly(options: ServeOptions = {}): DollyServer {
+/** The embedded webview, by relative path; absent in a plain checkout. */
+async function embeddedUi(): Promise<Record<string, string> | undefined> {
+  try {
+    return (await import("./ui.generated")).default;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function serveDolly(options: ServeOptions = {}): Promise<DollyServer> {
   const store = options.store ?? new PatternStore();
   const token = options.token ?? randomBytes(24).toString("base64url");
   const uiDir = resolve(options.uiDir ?? UI_DIST);
-  const uiAvailable = existsSync(join(uiDir, "index.html"));
+  const embedded = options.uiDir ? undefined : await embeddedUi();
+  const uiAvailable = embedded !== undefined || existsSync(join(uiDir, "index.html"));
 
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: options.port ?? DEFAULT_PORT,
     idleTimeout: 0, // a watch stream is idle by design between reports
-    fetch: (request) => handle(request, { store, token, uiDir, uiAvailable }),
+    fetch: (request) => handle(request, { store, token, uiDir, uiAvailable, embedded }),
   });
 
   const port = server.port as number; // always set for a TCP listener
@@ -120,6 +130,8 @@ interface Context {
   token: string;
   uiDir: string;
   uiAvailable: boolean;
+  /** The webview's files when dolly carries them embedded, else served from uiDir. */
+  embedded?: Record<string, string>;
 }
 
 /** A path under the home directory, the way a shell would print it. */
@@ -608,6 +620,10 @@ async function serveStatic(request: Request, ctx: Context, pathname: string): Pr
     );
   }
   const relative = pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+  if (ctx.embedded) {
+    const embeddedFile = ctx.embedded[relative];
+    return embeddedFile ? new Response(Bun.file(embeddedFile)) : json({ error: "Not found." }, 404);
+  }
   const file = resolve(ctx.uiDir, relative);
   if (file !== ctx.uiDir && !file.startsWith(ctx.uiDir + sep)) {
     return json({ error: "Not found." }, 404); // Traversal is a 404, not a hint.

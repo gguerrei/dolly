@@ -34,9 +34,9 @@
       "name": "dollysheep",
       "version": "0.1.0-dev",
       "bin": {
-        "dolly": "./src/main.ts",
+        "dolly": "./dist/main.js",
       },
-      "dependencies": {
+      "devDependencies": {
         "@dollysheep/core": "workspace:*",
         "commander": "^14.0.0",
       },

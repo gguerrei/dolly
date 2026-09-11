@@ -482,7 +482,7 @@ program
     if (!Number.isInteger(port) || port < 0 || port > 65535) {
       throw new Error(`"${options.port}" is not a port (0 to 65535).`);
     }
-    const server = serveDolly({ port });
+    const server = await serveDolly({ port });
     console.log(`dolly is serving at ${server.url}`);
     if (!server.uiAvailable) {
       console.log("(API only: no built GUI found; run `bun run build` in apps/desktop.)");

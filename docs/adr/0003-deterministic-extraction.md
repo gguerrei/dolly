@@ -62,3 +62,14 @@ uncoordinated schema growth would make `format: 1` meaningless.
 - The M2 schema diff (naming.extensions, languages restructure + versions,
   toolchain roles + configs-as-files, layout path refinement) ships under
   format 1, per rule 5.
+
+## Amendment (2026-09-10): the bump discipline
+
+Rule 5 ends with the first public release. From v0.1.0 on, `PATTERN_FORMAT`
+in `packages/core/src/pattern/schema.ts` is the one number every pattern
+carries, and it moves only when a change would make an older dolly misread a
+pattern (a renamed facet, a changed meaning), never for an addition an older
+dolly can ignore. A bump lands with a migration in `pattern/document.ts` that
+reads the previous format and writes the current one, and with a note in the
+changelog. A pattern from a newer dolly is refused with the upgrade hint,
+never misread; a pattern from an older one is migrated on read.

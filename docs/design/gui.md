@@ -216,6 +216,10 @@ why the whole shell is one small file plus the dialog plugin: the
 capability in `capabilities/default.json` grants the page the daemon
 serves (`http://127.0.0.1:*`) the open and save dialogs and nothing else,
 and `withGlobalTauri` is how the webview finds them without being built
-by Tauri. Still to come here: a bundled compiled daemon as a true sidecar;
-for now the shell presumes a checkout with `bun` on the PATH. Prerequisites and commands live in
-`apps/desktop/README.md`.
+by Tauri. Since 2026-09-10 the daemon is the shell's sidecar: `tauri build`
+first compiles dolly with the GUI embedded (`packages/cli/scripts/build-sidecar.ts`,
+`externalBin` in `tauri.conf.json`), Tauri bundles that binary beside the
+app's own executable, and `lib.rs` spawns it, falling back to `bun dolly
+serve` from the checkout only while developing (`tauri dev`). Prerequisites
+and commands live in `apps/desktop/README.md`; the release steps in
+`docs/RELEASING.md`.

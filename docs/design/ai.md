@@ -43,7 +43,7 @@ Lookup order, per provider:
 2. **The OS keychain**, written by `dolly ai connect`. dolly speaks to the keychain through the platform's own tool rather than a native module (the stack decision to prefer pure TS holds; a compiled binary must not drag a node-gyp dependency for one secret):
    - macOS: `security` against the login keychain (service `dolly`, account = provider). The write goes through `security -i` with the command on stdin, so the key never appears in an argv another process could list.
    - Linux: `secret-tool` (libsecret) with `service dolly account <provider>`; the secret rides stdin by the tool's own design.
-   - Windows: `connect` refuses for now, with the env var spelled out as the way in. `cmdkey` cannot read secrets back and the DPAPI route needs a real Windows machine to verify; that machine arrives with M9's CI matrix, and the keychain path is owed then.
+   - Windows (since 2026-09-10): DPAPI through PowerShell. `connect` pipes the key to `[Security.Cryptography.ProtectedData]::Protect` under the current user and writes the sealed bytes to `<dollyHome>/keys/<provider>.dpapi`; lookup unseals the same file. Only this Windows account can open it, nothing is ever plaintext on disk, and the CI matrix's Windows job proves the round trip.
 
 A missing keychain tool is an honest refusal naming the env var alternative, never a fallback to a plaintext file. Removing a stored key is the OS tool's job (`secret-tool clear service dolly account anthropic`, or Keychain Access on macOS); `connect` overwrites in place.
 

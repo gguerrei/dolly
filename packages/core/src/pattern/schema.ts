@@ -195,8 +195,15 @@ export const releasesSchema = z.strictObject({
  * `format` stays 1 while the schema is pre-public (ADR-0003); bump discipline
  * starts at the first public release.
  */
+/**
+ * The pattern format this dolly reads and writes. Fluid under 1 until the
+ * first public release (ADR-0003, rule 5); from then on a change that an
+ * older dolly could misread bumps it, with a migration in `document.ts`.
+ */
+export const PATTERN_FORMAT = 1;
+
 export const patternSchema = z.strictObject({
-  format: z.literal(1).default(1),
+  format: z.literal(PATTERN_FORMAT).default(PATTERN_FORMAT),
   name: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "pattern names are lowercase kebab-case"),
   description: z.string().default(""),
   license: licenseSchema.optional(),
