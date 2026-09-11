@@ -189,7 +189,7 @@ layout scanner already voted into existence, on an agreement bar: every
 member must carry the file, and the files must be byte-identical once each
 member's own name becomes {{name}} and the package scope {{project}}, so a
 template can never carry the source project's identity into an unrelated
-one. One dissenting member is a counted note instead — which is what dolly's
+one. One dissenting member is a counted note instead, which is what dolly's
 own packages and ADRs correctly produce. Capture gates (size, text, machine
 paths, and a refusal for files that already write {{ }}) now live in one
 shared module with the toolchain's.
@@ -214,8 +214,8 @@ Second-pass review of the M3 work, verified finding by finding against the
 code. The path gate now matches .git case-insensitively and survives
 Windows trailing-dot normalization; toolchain.configs values pass the full
 gate too, so backslash traversal is refused. The license scanner treats a
-GPL-family fingerprint as candidates a manifest can agree with (or not) —
-disagreement kills the facet even when the text cannot pin one id — and an
+GPL-family fingerprint as candidates a manifest can agree with (or not),
+where disagreement kills the facet even when the text cannot pin one id, and an
 unusable manifest declaration now silences a stray permissive LICENSE.
 Commands sweep to a fixpoint so dropping one verb orphans its callers,
 count direct yarn/pnpm script invocations as references, and scan recipe
@@ -234,13 +234,13 @@ Claude-Session: https://claude.ai/code/session_01EeoHCSeg3Jv7iQ7dFix4ey
 feat: enforce patterns with dolly check, plus the testing facet and hook fingerprints
 
 M4. A rule engine maps eight rules over the same shared inventory extract
-uses — layout, naming, config binding, commands, license, testing, hooks,
-and a built-in env-hygiene rule that leans on the walk itself: the
+uses: layout, naming, config binding, commands, license, testing, hooks,
+and a built-in env-hygiene rule that leans on the walk itself, since the
 inventory applies .gitignore, so a visible .env IS the violation. Each
 violation carries at most one autofix and --fix only ever creates,
 appends, or merges: renames stay fit's job, license text is never
 replaced, a root manifest is never invented, and files whose comments a
-rewrite would destroy degrade to reports. Fixing is idempotent — check
+rewrite would destroy degrade to reports. Fixing is idempotent: check
 re-runs its rules after fixing and a second --fix changes nothing.
 
 Three maintainer decisions shape it (docs/design/check.md): dolly new

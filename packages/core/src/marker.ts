@@ -143,7 +143,7 @@ export async function resolvePattern(
       name: marker.pattern,
     };
   }
-  return { store: await fetchedSource(marker), name: marker.pattern };
+  return { store: await fetchedSource(marker.source, marker), name: marker.pattern };
 }
 
 /**
@@ -151,9 +151,9 @@ export async function resolvePattern(
  * under `<home>/sources/`, stamped with the time of the fetch, so the
  * hour's checks read one fetch and a changed pin never reads an old copy.
  */
-async function fetchedSource(marker: Marker): Promise<PatternStore> {
+async function fetchedSource(url: string, marker: Marker): Promise<PatternStore> {
   const key = createHash("sha256")
-    .update(`${marker.source}\n${marker.sha256 ?? ""}`)
+    .update(`${url}\n${marker.sha256 ?? ""}`)
     .digest("hex");
   const dir = join(dollyHome(), SOURCES_DIR, key);
   const store = new PatternStore(join(dir, "patterns"));
@@ -162,16 +162,16 @@ async function fetchedSource(marker: Marker): Promise<PatternStore> {
   if (age !== undefined && age <= SOURCE_TUNING.reuseMs && (await store.has(marker.pattern))) {
     return store;
   }
-  const { name } = await importBundle(store, marker.source as string, {
+  const { name } = await importBundle(store, url, {
     force: true,
     ...(marker.sha256 ? { sha256: marker.sha256 } : {}),
   });
   if (name !== marker.pattern) {
     throw new MarkerError(
-      `${MARKER_FILE} names "${marker.pattern}", but the bundle at ${marker.source} holds "${name}".`,
+      `${MARKER_FILE} names "${marker.pattern}", but the bundle at ${url} holds "${name}".`,
     );
   }
-  await Bun.write(stamp, `${marker.source}\n`);
+  await Bun.write(stamp, `${url}\n`);
   return store;
 }
 
@@ -215,7 +215,7 @@ export async function linkProject(
   let vendored: string | undefined;
   if (options.vendorFrom) {
     await options.vendorFrom.load(pattern); // a vendored copy must be a valid pattern
-    vendored = join(VENDOR_DIR, pattern);
+    vendored = `${VENDOR_DIR}/${pattern}`; // the marker's own separator, whatever the platform's
     await rm(join(root, vendored), { recursive: true, force: true });
     await cp(options.vendorFrom.dirOf(pattern), join(root, vendored), { recursive: true });
   }
