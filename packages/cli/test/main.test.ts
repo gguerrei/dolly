@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, realpath, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,6 +10,10 @@ import pkg from "../package.json";
 const CLI = fileURLToPath(new URL("../src/main.ts", import.meta.url));
 
 let home: string;
+
+// Every run here spawns bun, which the Windows runner does in most of a second; a test
+// that runs the CLI eight times passes bun's five-second default.
+setDefaultTimeout(30_000);
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "dolly-cli-"));
