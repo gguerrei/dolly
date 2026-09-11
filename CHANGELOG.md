@@ -263,7 +263,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   serve`. A `v*` tag runs `.github/workflows/release.yml`: the three
   binaries, the installers, a draft release, and the npm publish when an
   `NPM_TOKEN` secret exists; `docs/RELEASING.md` has the steps and
-  `packaging/homebrew/dolly.rb` the formula.
+  `packaging/homebrew/dolly.rb` the formula. The shell passes
+  `dolly serve --exit-with-parent`, so the daemon stops when the window is
+  gone however it went.
 - Windows keys: `dolly ai connect` seals the key through DPAPI for the
   current user into `<dollyHome>/keys/<provider>.dpapi`, and lookup unseals
   it; nothing is ever plaintext on disk.

@@ -22,7 +22,10 @@ fn repo_root() -> PathBuf {
 
 /// The compiled daemon bundled beside the app (Tauri's sidecar, `externalBin` in
 /// tauri.conf.json), or `bun dolly serve` from the checkout while developing.
+/// Either way the daemon watches this process and stops when it is gone, so a
+/// window closed by a signal leaves no daemon behind.
 fn daemon() -> Command {
+    let serve = ["serve", "--port", "0", "--exit-with-parent"];
     let sidecar = std::env::current_exe().ok().and_then(|exe| {
         let name = if cfg!(windows) { "dolly.exe" } else { "dolly" };
         exe.parent().map(|dir| dir.join(name))
@@ -30,12 +33,12 @@ fn daemon() -> Command {
     match sidecar.filter(|path| path.is_file()) {
         Some(path) => {
             let mut command = Command::new(path);
-            command.args(["serve", "--port", "0"]);
+            command.args(serve);
             command
         }
         None => {
             let mut command = Command::new("bun");
-            command.args(["dolly", "serve", "--port", "0"]).current_dir(repo_root());
+            command.arg("dolly").args(serve).current_dir(repo_root());
             command
         }
     }
