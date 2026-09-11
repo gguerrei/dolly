@@ -445,13 +445,16 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
   }
 
   if (path === "/api/import" && request.method === "POST") {
-    const body = (await request.json()) as { file?: string; force?: boolean };
+    const body = (await request.json()) as { file?: string; force?: boolean; sha256?: string };
     if (!body.file)
       return json(
         { error: "`file` is required: the .dolly bundle to import, a path or an https URL." },
         400,
       );
-    const pattern = await importBundle(store, body.file, { force: body.force });
+    const pattern = await importBundle(store, body.file, {
+      force: body.force,
+      sha256: body.sha256,
+    });
     return json({ name: pattern.name, description: pattern.description });
   }
 

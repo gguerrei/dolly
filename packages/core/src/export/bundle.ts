@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { strFromU8, unzipSync, zipSync } from "fflate";
@@ -42,13 +43,17 @@ export async function exportBundle(
   return out;
 }
 
-/** Unpack a .dolly file, from a path or an http(s) URL, into the store and return the pattern it contained. */
+/**
+ * Unpack a .dolly file, from a path or an http(s) URL, into the store and
+ * return the pattern it contained. With `sha256`, the bytes must hash to it
+ * or nothing is read: a pinned URL cannot be swapped under a project.
+ */
 export async function importBundle(
   store: PatternStore,
   source: string,
-  options: { force?: boolean } = {},
+  options: { force?: boolean; sha256?: string } = {},
 ): Promise<Pattern> {
-  const entries = await readBundle(source);
+  const entries = await readBundle(source, options.sha256);
   const files = Object.entries(entries).filter(([path]) => !path.endsWith("/"));
   for (const [path] of files) {
     // The same gate every pattern-supplied path passes. Bundles are the
@@ -75,13 +80,18 @@ export async function importBundle(
 }
 
 /** Unzip with sanity caps so a tiny malicious file can't balloon into memory or disk. */
-async function readBundle(source: string): Promise<Record<string, Uint8Array>> {
+async function readBundle(source: string, sha256?: string): Promise<Record<string, Uint8Array>> {
   let entryCount = 0;
   let declaredBytes = 0;
   try {
     const bytes = /^https?:\/\//.test(source)
       ? await fetchBundle(source)
       : new Uint8Array(await readFile(source));
+    if (sha256 && createHash("sha256").update(bytes).digest("hex") !== sha256.toLowerCase()) {
+      throw new InvalidBundleError(
+        `"${source}" does not match the sha256 it was pinned to, so it was not read.`,
+      );
+    }
     const entries = unzipSync(bytes, {
       filter: (file) => {
         entryCount += 1;

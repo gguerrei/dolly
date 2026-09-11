@@ -1,6 +1,6 @@
 [package]
 name = "dolly-desktop"
-version = "0.1.0"
+version = "0.1.0-dev"
 description = "dolly's native shell: a window around `dolly serve`"
 license = "MIT"
 edition = "2021"

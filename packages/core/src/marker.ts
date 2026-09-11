@@ -32,6 +32,8 @@ export interface Marker {
   pattern: string;
   /** A project-relative directory in the store's layout, or a URL to a .dolly bundle. */
   source?: string;
+  /** The bundle's sha256, when `source` is a URL: it must hash to this or it is not read. */
+  sha256?: string;
   ignore: string[];
   rules: Partial<Record<RuleId, RuleSetting>>;
 }
@@ -48,6 +50,10 @@ const markerSchema = z.strictObject({
       "source is a project-relative directory or an https URL to a .dolly bundle",
     )
     .optional(),
+  sha256: z
+    .string()
+    .regex(/^[A-Fa-f0-9]{64}$/, "sha256 is the bundle's hash, 64 hex characters")
+    .optional(),
   ignore: z
     .array(z.string().refine(isSafePatternPath, "ignore entries are relative paths"))
     .default([]),
@@ -62,12 +68,14 @@ export class MarkerError extends Error {
 export function markerContents(marker: {
   pattern: string;
   source?: string;
+  sha256?: string;
   ignore?: string[];
   rules?: Partial<Record<RuleId, RuleSetting>>;
 }): string {
   return stringifyYaml({
     pattern: marker.pattern,
     ...(marker.source ? { source: marker.source } : {}),
+    ...(marker.sha256 ? { sha256: marker.sha256 } : {}),
     ...(marker.ignore?.length ? { ignore: marker.ignore } : {}),
     ...(Object.keys(marker.rules ?? {}).length ? { rules: marker.rules } : {}),
   });
@@ -128,7 +136,10 @@ export async function resolvePattern(
   const fetched = new PatternStore(
     join(tmpdir(), "dolly-sources", createHash("sha256").update(marker.source).digest("hex")),
   );
-  const { name } = await importBundle(fetched, marker.source, { force: true });
+  const { name } = await importBundle(fetched, marker.source, {
+    force: true,
+    ...(marker.sha256 ? { sha256: marker.sha256 } : {}),
+  });
   if (name !== marker.pattern) {
     throw new MarkerError(
       `${MARKER_FILE} names "${marker.pattern}", but the bundle at ${marker.source} holds "${name}".`,

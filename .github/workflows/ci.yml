@@ -22,6 +22,7 @@ jobs:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       - run: bun run check
+      - run: bun run version:check
       - run: bun run typecheck
       - run: bun run --cwd apps/desktop build
 

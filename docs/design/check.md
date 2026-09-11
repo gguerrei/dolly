@@ -70,7 +70,11 @@ a store rooted at `dolly/`) and writes `source: dolly`; linking again
 without `--vendor` drops the source, since the store is the pattern's home
 again. A `source` may also be an https URL to a `.dolly` bundle, fetched
 into a temporary store for the run under the same caps as `dolly import`,
-and refused when the bundle names a different pattern than the marker.
+and refused when the bundle names a different pattern than the marker. A
+URL should come with `sha256:` (the bundle's hash, quoted if it happens to
+be all digits): the bytes must hash to it or nothing is read, so a bundle
+swapped behind a URL cannot reach a project; `dolly import --sha256` is the
+same pin from the terminal.
 
 `ignore` (added 2026-09-01) is the project's own word on which paths check
 leaves alone: a mandated kebab-case script in a snake_case repo, a legacy

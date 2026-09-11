@@ -15,7 +15,9 @@
     "test": "bun test",
     "build:ui": "bun run --cwd apps/desktop build && bun packages/cli/scripts/embed-ui.ts",
     "build:binary": "bun run build:ui && bun build --compile packages/cli/src/main.ts --outfile dist/dolly",
-    "build:npm": "bun run build:ui && bun build --target=bun packages/cli/src/main.ts --outdir packages/cli/dist"
+    "build:npm": "bun run build:ui && bun build --target=bun packages/cli/src/main.ts --outdir packages/cli/dist && bun packages/cli/scripts/pack.ts",
+    "version:set": "bun scripts/version.ts",
+    "version:check": "bun scripts/version.ts --check"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.1.0",

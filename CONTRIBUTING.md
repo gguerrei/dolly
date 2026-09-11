@@ -38,9 +38,12 @@ bun test
 Anything a person will look at (the mark, a GUI view, an empty state, a
 docs or installer visual) is designed before it is built: on a Claude Design
 canvas, through the `/design` command in Claude Code, and approved there.
-Code follows the approved board and the port is reviewed against it. The
-boards live in [docs/design/canvas/](docs/design/canvas/README.md); the rule
-itself is in [docs/PLAN.md](docs/PLAN.md), "How visual work happens".
+Code follows the approved board and the port is reviewed against it. One
+exception: a small addition to an approved board that reuses its own
+components and vocabulary (a button, a toggle, a tile, a row action) is
+ported directly and reviewed live. The boards live in
+[docs/design/canvas/](docs/design/canvas/README.md); the rule itself is in
+[docs/PLAN.md](docs/PLAN.md), "How visual work happens".
 
 ## Commits
 

@@ -275,7 +275,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The open source set is complete: `THIRD_PARTY_LICENSES.md` (Inter under
   the OFL among them), `SUPPORT.md`, `CODEOWNERS`, dependabot, a pinned
   `.bun-version` that CI honors, a publishable `dollysheep` manifest, and the
-  session log moved to `docs/log.md`.
+  session log moved to `docs/log.md`. The npm tarball carries the license,
+  its own README and the third-party notices, and the desktop bundles carry
+  the notices as resources.
+- A marker's `source:` URL can be pinned with `sha256:`, and `dolly import
+  --sha256` pins a bundle the same way: the bytes must hash to it or nothing
+  is read.
+- `bun run version:set <version>` writes the version into every file that
+  carries one, and `bun run version:check` (run by CI) fails when they
+  disagree.
 
 ### Changed
 
