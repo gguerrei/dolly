@@ -1,7 +1,7 @@
 name: Release
 
 # A tag v* builds the three binaries with the GUI embedded, the Tauri
-# installers with the compiled daemon as their sidecar, and the npm package,
+# installers with the compiled daemon as their sidecar, and the two npm packages,
 # then opens a draft release carrying the binaries. Publishing the draft and
 # the Homebrew formula stay the maintainer's (docs/RELEASING.md).
 
@@ -90,11 +90,13 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      - run: bun run build:core
       - run: bun run build:npm
-      - name: Publish dollysheep
+      - name: Publish @dollysheep/core and dollysheep
         run: |
           if [ -z "$NPM_CONFIG_TOKEN" ]; then
-            echo "NPM_TOKEN is not set in the repository's secrets; the package was built but not published."
+            echo "NPM_TOKEN is not set in the repository's secrets; the packages were built but not published."
             exit 0
           fi
+          bun publish --cwd packages/core/dist --access public
           bun publish --cwd packages/cli --access public
