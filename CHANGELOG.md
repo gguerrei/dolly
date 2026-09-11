@@ -290,6 +290,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A marker's `source:` URL is fetched under the dolly home, one copy per URL
   and pin, read again for an hour instead of fetched, and `dolly home
   --prune` removes the copies older than a week.
+- A repository without a root manifest (a tree of samples, a monorepo whose
+  members carry their own) takes its toolchain and ecosystem from the
+  members' vote, role by role, the dissenters named in the notes; a
+  pattern's ecosystem is read from its package manager first, and `new`
+  writes no manifest at the root when the layout keeps it in each member.
 
 ### Changed
 

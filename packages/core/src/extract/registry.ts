@@ -103,15 +103,44 @@ export function ecosystemOf(programming: string[], rootPaths: Set<string>): Ecos
   return [...rootPaths].some((file) => DOTNET_PROJECT.test(file)) ? "nuget" : undefined;
 }
 
+/** The ecosystem each package manager serves: a pattern naming one has said which it is. */
+const ECOSYSTEM_BY_PACKAGE_MANAGER: Record<string, Ecosystem> = {
+  bun: "npm",
+  pnpm: "npm",
+  yarn: "npm",
+  npm: "npm",
+  uv: "pypi",
+  poetry: "pypi",
+  pdm: "pypi",
+  pipenv: "pypi",
+  pip: "pypi",
+  cargo: "cargo",
+  "go-modules": "go",
+  bundler: "rubygems",
+  maven: "maven",
+  gradle: "maven",
+  composer: "composer",
+  nuget: "nuget",
+};
+
 /**
  * The ecosystem a *pattern* prescribes, the one place new and check derive
- * it, with the same root-file semantics extract feeds `ecosystemOf`, so a
- * scaffold can never resolve differently from the pattern it came from.
+ * it. The package manager names it outright (extract's toolchain roles come
+ * from the primary ecosystem, so the two agree by construction, and a tree
+ * whose toolchain was voted by its members keeps their ecosystem over the
+ * language that dominates its bytes); without one, the same language and
+ * root-file semantics extract feeds `ecosystemOf`, so a scaffold can never
+ * resolve differently from the pattern it came from.
  */
 export function ecosystemOfPattern(pattern: {
   languages?: { programming: string[] };
   layout: { path: string }[];
+  toolchain?: { packageManager?: string };
 }): Ecosystem | undefined {
+  const byManager =
+    pattern.toolchain?.packageManager &&
+    ECOSYSTEM_BY_PACKAGE_MANAGER[pattern.toolchain.packageManager];
+  if (byManager) return byManager;
   const rootFiles = new Set(
     pattern.layout.map((entry) => entry.path).filter((p) => !p.includes("/") && !p.endsWith("/")),
   );
