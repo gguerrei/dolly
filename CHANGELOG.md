@@ -247,6 +247,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the CLI, the daemon, and the export view.
 - `dolly ai --verify` makes one live call and reports the provider's verdict
   on the active key.
+- The GUI reaches everything the CLI does: the library's extract panel
+  takes several projects, the pattern view links a project (with the
+  vendored copy) and edits captured configs and templates as tabs beside
+  `pattern.md` in Source mode, and the check view shows the ignored count,
+  a warning badge on rules the marker turned down, an ignore action on
+  every row, and a Conventions toggle. The daemon serves a pattern's files
+  on `GET` and `PUT /api/patterns/:name/files/<path>`, and the CLI edits
+  one with `dolly edit <name> <file>`.
 
 ### Changed
 

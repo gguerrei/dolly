@@ -60,6 +60,15 @@ export interface CheckViolation {
   path: string;
   message: string;
   fixable: boolean;
+  /** Present when the marker's `rules` turned the rule down: reported, never counted. */
+  severity?: "warning";
+}
+
+/** One line of the model's reading of the prose conventions. */
+export interface ConventionFinding {
+  path: string;
+  line?: number;
+  message: string;
 }
 
 export interface CheckReport {
@@ -67,6 +76,10 @@ export interface CheckReport {
   violations: CheckViolation[];
   fixed: string[];
   diagnostics: string[];
+  /** Violations the marker's ignore list and rule settings set aside. */
+  ignored: number;
+  /** Under the Conventions toggle: the model, its findings, and the files the bounds left out. */
+  conventions?: { model: string; findings: ConventionFinding[]; skipped: string[] };
 }
 
 /** A fix as data, mirrored from @dollysheep/core's FixPlan. */
@@ -233,12 +246,36 @@ export const api = {
     params.set("as", as);
     return request<RenderedExport>(`/api/export?${params}`);
   },
-  /** `dolly extract` over the wire: what it saved, the way the CLI says it. */
-  extract: (dir: string, name: string | undefined, force?: boolean) =>
+  /** `dolly extract` over the wire: one project, or several to keep what they agree on. */
+  extract: (dirs: string[], name: string | undefined, force?: boolean) =>
     request<{ name: string; facets: string[]; captured: number }>("/api/extract", {
       method: "POST",
-      body: JSON.stringify({ dir, name: name || undefined, force }),
+      body: JSON.stringify({
+        ...(dirs.length === 1 ? { dir: dirs[0] } : { dirs }),
+        name: name || undefined,
+        force,
+      }),
     }),
+  /** `dolly link`: the marker written, the pattern copied into the project with `vendor`. */
+  link: (dir: string, pattern: string, vendor?: boolean) =>
+    request<{ pattern: string; replaced?: string; vendored?: string }>("/api/link", {
+      method: "POST",
+      body: JSON.stringify({ dir, pattern, vendor }),
+    }),
+  /** `dolly ignore`: paths added to the marker's ignore list. */
+  ignore: (dir: string, paths: string[]) =>
+    request<{ pattern: string; ignore: string[] }>("/api/ignore", {
+      method: "POST",
+      body: JSON.stringify({ dir, paths }),
+    }),
+  /** A pattern's captured files (configs and templates), pattern-relative. */
+  listPatternFiles: (name: string) =>
+    request<string[]>(`/api/patterns/${encodeURIComponent(name)}/files`),
+  getPatternFile: (name: string, path: string) =>
+    request<{ path: string; contents: string }>(patternFileUrl(name, path)),
+  /** The author's own bytes, written as they are. */
+  savePatternFile: (name: string, path: string, contents: string) =>
+    request<{ path: string }>(patternFileUrl(name, path), { method: "PUT", body: contents }),
   /** `dolly new`: the scaffold report; a directory that is not empty is a 409. */
   scaffold: (pattern: string, dir: string) =>
     request<ScaffoldReport>("/api/new", { method: "POST", body: JSON.stringify({ pattern, dir }) }),
@@ -272,7 +309,7 @@ export const api = {
     request<{ deleted: string }>(`/api/patterns/${encodeURIComponent(name)}`, {
       method: "DELETE",
     }),
-  check: (dir: string, options: { pattern?: string; fix?: boolean } = {}) =>
+  check: (dir: string, options: { pattern?: string; fix?: boolean; conventions?: boolean } = {}) =>
     request<CheckReport>("/api/check", {
       method: "POST",
       body: JSON.stringify({ dir, ...options }),
@@ -345,6 +382,11 @@ function streamLines<T>(
     }
   })();
   return () => aborter.abort();
+}
+
+function patternFileUrl(name: string, path: string): string {
+  const rel = path.split("/").map(encodeURIComponent).join("/");
+  return `/api/patterns/${encodeURIComponent(name)}/files/${rel}`;
 }
 
 function streamParams(dir: string, pattern: string | undefined): URLSearchParams {

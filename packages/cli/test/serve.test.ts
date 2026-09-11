@@ -433,6 +433,34 @@ describe("dolly serve", () => {
     expect(notABundle.status).toBe(400);
   });
 
+  test("a pattern's captured files are listed, read, and written over the wire, inside the pattern only", async () => {
+    await seedPattern("tidy", DOCS_REQUIRED);
+    const toolchain = join(home, "patterns", "tidy", "toolchain");
+    await mkdir(toolchain, { recursive: true });
+    await writeFile(join(toolchain, "biome.json"), "{}\n");
+    expect(await (await api("/api/patterns/tidy/files")).json()).toEqual(["toolchain/biome.json"]);
+    const got = await api("/api/patterns/tidy/files/toolchain/biome.json");
+    expect(await got.json()).toEqual({
+      name: "tidy",
+      path: "toolchain/biome.json",
+      contents: "{}\n",
+    });
+    const put = await api("/api/patterns/tidy/files/toolchain/biome.json", {
+      method: "PUT",
+      body: '{ "a": 1 }\n',
+    });
+    expect(put.status).toBe(200);
+    expect(await readFile(join(toolchain, "biome.json"), "utf8")).toBe('{ "a": 1 }\n');
+    // pattern.md has its own route, a missing capture is a 404, and nothing escapes the pattern.
+    expect((await api("/api/patterns/tidy/files/pattern.md")).status).toBe(400);
+    expect((await api("/api/patterns/tidy/files/toolchain/missing.json")).status).toBe(404);
+    const outside = await api("/api/patterns/tidy/files/toolchain/..%2F..%2Fescape", {
+      method: "PUT",
+      body: "x",
+    });
+    expect(outside.status).toBe(400);
+  });
+
   test("link vendors the pattern on request, and ignore appends to the marker", async () => {
     await seedPattern("tidy", DOCS_REQUIRED);
     const dir = join(home, "vendored");

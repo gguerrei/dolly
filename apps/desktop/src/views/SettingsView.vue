@@ -223,6 +223,10 @@ onMounted(load);
               <span class="muted">drafts convention lines from the files that changed, once per session, for you to accept or skip.</span>
             </span>
             <span>
+              <strong>Check</strong>
+              <span class="muted">reads the prose conventions against the files changed since HEAD when you ask, reported apart and never counted.</span>
+            </span>
+            <span>
               <strong>Everything else</strong>
               <span class="muted">
                 is deterministic and calls nothing.<template v-if="!on">

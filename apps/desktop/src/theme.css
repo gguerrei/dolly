@@ -1423,3 +1423,27 @@ tr.sub td.path {
 .toast.error {
   box-shadow: inset 3px 0 0 var(--warm);
 }
+
+/* ---- a labeled checkbox in a toolbar, and a file list that wraps ---- */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--grey);
+  cursor: pointer;
+}
+
+.toggle input {
+  accent-color: var(--charcoal);
+  margin: 0;
+}
+
+.segmented.files {
+  flex-wrap: wrap;
+}
+
+.segmented.files button {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}

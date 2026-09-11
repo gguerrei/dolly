@@ -122,6 +122,7 @@ export {
 // Storage
 export {
   dollyHome,
+  InvalidPatternFileError,
   InvalidPatternNameError,
   PatternNotFoundError,
   PatternStore,

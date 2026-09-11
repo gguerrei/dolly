@@ -24,6 +24,7 @@ import {
   facetNames,
   gitStateOf,
   InvalidBundleError,
+  InvalidPatternFileError,
   InvalidPatternNameError,
   ignorePaths,
   importBundle,
@@ -190,6 +191,35 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
 
   if (path === "/api/patterns" && request.method === "GET") {
     return json(await store.list());
+  }
+
+  // A pattern's captured files (configs and templates): listed, read, and
+  // written as the author's own bytes, inside the pattern directory only.
+  const filesRoute = path.match(/^\/api\/patterns\/([^/]+)\/files(?:\/(.+))?$/);
+  if (filesRoute) {
+    const name = decodeURIComponent(filesRoute[1] as string);
+    const rel = filesRoute[2] ? decodeURIComponent(filesRoute[2]) : undefined;
+    if (rel === undefined) {
+      if (request.method !== "GET")
+        return json({ error: `${request.method} is not supported here.` }, 405);
+      return json(await store.files(name));
+    }
+    const file = Bun.file(store.fileOf(name, rel)); // InvalidPatternFileError → 400
+    if (!(await file.exists()))
+      return json({ error: `"${name}" has no captured file ${rel}.` }, 404);
+    if (request.method === "GET") return json({ name, path: rel, contents: await file.text() });
+    if (request.method === "PUT") {
+      const contents = await request.text();
+      if (Buffer.byteLength(contents) > MAX_PATTERN_BYTES) {
+        return json(
+          { error: "That file is over 1 MiB. Captured files are configs, not payloads." },
+          413,
+        );
+      }
+      await writeFile(store.fileOf(name, rel), contents);
+      return json({ name, path: rel });
+    }
+    return json({ error: `${request.method} is not supported here.` }, 405);
   }
 
   const patternRoute = path.match(/^\/api\/patterns\/([^/]+)$/);
@@ -599,6 +629,7 @@ function errorResponse(error: unknown): Response {
   if (error instanceof FitGitError) return json({ error: error.message }, 409);
   if (error instanceof PatternNotFoundError) return json({ error: error.message }, 404);
   if (error instanceof InvalidPatternNameError) return json({ error: error.message }, 400);
+  if (error instanceof InvalidPatternFileError) return json({ error: error.message }, 400);
   if (error instanceof MarkerError) return json({ error: error.message }, 400);
   if (error instanceof PatternParseError) return json({ error: error.message }, 422);
   // A key the provider refused, or the caller's own mistake: bad requests, in plain words.

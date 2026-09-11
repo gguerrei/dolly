@@ -362,12 +362,30 @@ program
 program
   .command("edit")
   .argument("<name>", "pattern to edit")
+  .argument(
+    "[file]",
+    "a captured file inside it (toolchain/… or templates/…) instead of pattern.md",
+  )
   .description("Open a pattern in your editor, then validate it.")
-  .action(async (name: string) => {
+  .action(async (name: string, file: string | undefined) => {
     const store = new PatternStore();
     if (!(await store.has(name))) throw new PatternNotFoundError(name);
     const editor = process.env.VISUAL || process.env.EDITOR;
     if (!editor) throw new Error("Set $EDITOR (or $VISUAL) so dolly knows which editor to open.");
+
+    // A captured file is the author's own bytes: opened in place, nothing to validate.
+    if (file) {
+      const target = store.fileOf(name, file);
+      if (!(await Bun.file(target).exists())) {
+        const files = await store.files(name);
+        throw new Error(
+          `"${name}" has no captured file ${file}${files.length ? `; it has ${files.join(", ")}` : ""}.`,
+        );
+      }
+      await openEditor(editor, target);
+      console.log(`${file} of "${name}" saved.`);
+      return;
+    }
 
     // The editor works on a copy; the store's own file changes only once the copy parses.
     const draft = join(tmpdir(), `dolly-edit-${name}-${process.pid}.md`);
