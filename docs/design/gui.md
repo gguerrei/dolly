@@ -55,6 +55,8 @@ that does not validate).
 | `GET /api/patterns/:name` | `PatternStore` + `parsePatternDocument` | raw `source` always; parsed `pattern` + `prose`, or `error` when invalid (the editor needs broken patterns most) |
 | `PUT /api/patterns/:name` | `parsePatternDocument` + verbatim write | `dolly edit` over HTTP: body is raw source, validated first; valid source is written byte-for-byte (the author's formatting is theirs), invalid is 422 with the parse error and nothing written |
 | `DELETE /api/patterns/:name` | `PatternStore.delete` | |
+| `GET /api/patterns/:name/files` | `PatternStore.files` | the captured files (configs and templates), pattern-relative |
+| `GET` and `PUT /api/patterns/:name/files/<path>` | `PatternStore.fileOf` | one captured file read, or written as the author's own bytes (`dolly edit <name> <file>` over HTTP); a path outside `toolchain/` or `templates/` is a 400, a missing capture a 404 |
 | `POST /api/check` | `checkProject`, or `assistedCheck` with `conventions` (+ `resolvePattern`) | `{ dir, pattern?, fix?, conventions? }`; pattern falls back to the project's `.dolly` marker (its `source` picks the store), same resolution order as the CLI; `conventions: true` adds the model's reading of the prose, a 400 with AI off |
 | `POST /api/fit` | `assistedFit` / `assistedFitApply` (+ `gitStateOf`) | `{ dir, pattern?, apply? }`; the `FitPlan` is data end to end, so it crosses the wire as itself (each fix step with its `preview`, the patch as a unified diff), plus `git` so the UI can gate Apply; with AI on, declined items may carry a `suggestion` and steps may be `translate`; apply's git preconditions come back as 409 |
 | `GET /api/ai/providers` | `aiProviders` | every provider with its label, default model, and where its key lives |
@@ -98,10 +100,13 @@ view and every saved pattern) over the content. Seven views behind a hash
   delete on hover), broken ones flagged the way `dolly list` flags them. Entry point to the other views, and where
   patterns arrive: Extract a project and Import a bundle open inline
   panels under the head (a path, Browse in the shell, a name for
-  extract), and a name already in the library comes back as Replace or
-  Keep mine.
+  extract; Add another project turns the extraction into `dolly extract
+  a b c --name`, keeping what the projects agree on), and a name already
+  in the library comes back as Replace or Keep mine.
 - **Pattern**: New project opens an inline panel (the target directory,
-  picked or typed, then the scaffold report with its next steps); Export
+  picked or typed, then the scaffold report with its next steps); Link a
+  project opens another (the directory, and a checked box that copies the
+  pattern into it under `dolly/`, which is `dolly link --vendor`); Export
   leads to the export view. Below, an *Overview* of the facets as a two-column grid of panels
   (project, with the two history facets as one line each; toolchain with
   its captured configs, commands, the conventions rendered from their
@@ -110,7 +115,9 @@ view and every saved pattern) over the content. Seven views behind a hash
   with its required badges, naming, testing, dependencies), and a
   *Source* mode over the raw `pattern.md` with the CLI's validate-on-save
   loop: a 422 shows the parse error inline and keeps editing, never losing
-  the buffer.
+  the buffer. A pattern with captured files shows them as tabs beside
+  `pattern.md`, each edited and written as the author's own bytes (`dolly
+  edit <name> <file>`).
   The editor is CodeMirror 6 with YAML awareness, themed entirely from the
   palette's CSS variables so one theme serves both schemes: keys carry
   weight, comments and strings shade grey, literals take the one warm
@@ -118,10 +125,15 @@ view and every saved pattern) over the content. Seven views behind a hash
 - **Check**: a project directory (typed, remembered in `localStorage`),
   the pattern resolved from its marker or picked explicitly, then: run,
   fix, or watch (a toggle that holds the NDJSON stream open and repaints
-  on every report). The report renders as four stat tiles (counts in
-  tabular numerals, the violation count in the warm tone) over one panel
-  per rule, diagnostics kept visually apart as the pattern author's
-  problem.
+  on every report), and a Conventions checkbox that asks the model to read
+  the prose too (`dolly check --conventions`, off while watching). The
+  report renders as five stat tiles (counts in tabular numerals, the
+  violation count in the warm tone only when something would fail, and
+  what the marker set aside as ignored) over one panel per rule, each row
+  wearing a warning badge when the marker turned its rule down and an
+  ignore action that adds the path to the marker's list (`dolly ignore`),
+  the model's findings in their own panel labeled with the model, and
+  diagnostics kept visually apart as the pattern author's problem.
 - **Fit**: the same directory (shared with Check via `localStorage`),
   then Plan: moves with their import rewrites as subordinate lines, fixes
   with their plan kind and, since 2026-09-01, the patch each would make as

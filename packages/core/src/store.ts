@@ -1,5 +1,5 @@
 import type { Dirent } from "node:fs";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -8,7 +8,7 @@ import {
   parsePatternDocument,
   serializePatternDocument,
 } from "./pattern/document";
-import { patternSchema } from "./pattern/schema";
+import { isSafePatternPath, patternSchema } from "./pattern/schema";
 
 export const PATTERN_FILE = "pattern.md";
 
@@ -121,6 +121,36 @@ export class PatternStore {
     // Require a pattern.md but not a parseable one, so broken patterns can still be deleted.
     if (!(await this.has(name))) throw new PatternNotFoundError(name);
     await rm(this.dirOf(name), { recursive: true });
+  }
+
+  /** The pattern's captured files (configs and templates), pattern-relative and sorted; pattern.md is not among them. */
+  async files(name: string): Promise<string[]> {
+    if (!(await this.has(name))) throw new PatternNotFoundError(name);
+    const dir = this.dirOf(name);
+    const files: string[] = [];
+    for (const entry of await readdir(dir, { recursive: true })) {
+      const rel = entry.replaceAll("\\", "/");
+      if (rel !== PATTERN_FILE && (await lstat(join(dir, rel))).isFile()) files.push(rel);
+    }
+    return files.sort();
+  }
+
+  /** Absolute path of a captured file, behind the one gate every pattern path passes. */
+  fileOf(name: string, rel: string): string {
+    if (!isSafePatternPath(rel) || !/^(toolchain|templates)\/.+/.test(rel)) {
+      throw new InvalidPatternFileError(rel);
+    }
+    return join(this.dirOf(name), rel);
+  }
+}
+
+export class InvalidPatternFileError extends Error {
+  override name = "InvalidPatternFileError";
+
+  constructor(rel: string) {
+    super(
+      `"${rel}" is not a captured file: those live under toolchain/ or templates/ in the pattern.`,
+    );
   }
 }
 

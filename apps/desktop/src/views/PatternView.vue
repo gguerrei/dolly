@@ -40,10 +40,38 @@ async function load(): Promise<void> {
   loading.value = false;
 }
 
+/** Source mode edits pattern.md, or any captured file the pattern carries (`dolly edit <name> [file]`). */
+const files = ref<string[]>([]);
+const editing = ref("pattern.md");
+
 function startEdit(): void {
   buffer.value = detail.value?.source ?? "";
+  editing.value = "pattern.md";
   saveError.value = "";
   mode.value = "edit";
+  api.listPatternFiles(props.name).then(
+    (list) => {
+      files.value = list;
+    },
+    () => {
+      files.value = [];
+    },
+  );
+}
+
+async function openFile(file: string): Promise<void> {
+  saveError.value = "";
+  if (file === "pattern.md") {
+    buffer.value = detail.value?.source ?? "";
+    editing.value = file;
+    return;
+  }
+  try {
+    buffer.value = (await api.getPatternFile(props.name, file)).contents;
+    editing.value = file;
+  } catch (cause) {
+    saveError.value = cause instanceof Error ? cause.message : String(cause);
+  }
 }
 
 function cancelEdit(): void {
@@ -55,6 +83,12 @@ async function save(): Promise<void> {
   saving.value = true;
   saveError.value = "";
   try {
+    if (editing.value !== "pattern.md") {
+      // A captured file is the author's own bytes: written as they are.
+      await api.savePatternFile(props.name, editing.value, buffer.value);
+      toast("success", `${editing.value} saved.`);
+      return;
+    }
     await api.savePattern(props.name, buffer.value);
     toast("success", `"${props.name}" saved and valid.`);
     await load(); // re-read the saved truth
@@ -64,6 +98,33 @@ async function save(): Promise<void> {
     saveError.value = cause instanceof Error ? cause.message : String(cause);
   } finally {
     saving.value = false;
+  }
+}
+
+/** `dolly link` from here: the project directory, and whether to copy the pattern into it. */
+const linking = ref(false);
+const linkDir = ref("");
+const vendor = ref(true);
+const linkBusy = ref(false);
+const linkError = ref("");
+const linked = ref<{ replaced?: string; vendored?: string } | null>(null);
+
+function openLink(): void {
+  linking.value = !linking.value;
+  linked.value = null;
+  linkError.value = "";
+}
+
+async function link(): Promise<void> {
+  linkBusy.value = true;
+  linkError.value = "";
+  try {
+    linked.value = await api.link(linkDir.value, props.name, vendor.value);
+    toast("success", `Linked ${linkDir.value} to "${props.name}".`);
+  } catch (cause) {
+    linkError.value = cause instanceof Error ? cause.message : String(cause);
+  } finally {
+    linkBusy.value = false;
   }
 }
 
@@ -184,6 +245,7 @@ function openScaffold(): void {
   scaffolding.value = !scaffolding.value;
   scaffolded.value = null;
   scaffoldError.value = "";
+  linking.value = false;
 }
 
 async function scaffold(): Promise<void> {
@@ -251,6 +313,13 @@ onMounted(load);
             </svg>
             New project
           </button>
+          <button v-if="reading && pattern" type="button" :aria-pressed="linking" @click="openLink(); scaffolding = false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 0 0-5.7-5.7l-1.4 1.4" />
+              <path d="M14 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 0 0 5.7 5.7l1.4-1.4" />
+            </svg>
+            Link a project
+          </button>
           <a v-if="reading && pattern" class="button" :href="`#/export/${encodeURIComponent(name)}`">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 15V4" />
@@ -288,6 +357,29 @@ onMounted(load);
             <span v-for="step in scaffolded.nextSteps" :key="step"><code>{{ step }}</code></span>
           </div>
           <span v-else class="note">The directory's name becomes the project's. It must be empty or not exist yet; nothing is ever written over.</span>
+        </div>
+      </form>
+
+      <form v-if="reading && pattern && linking" class="panel flow" @submit.prevent="link">
+        <div class="panel-head">
+          <h3>Link a project to {{ props.name }}</h3>
+          <span class="count">the same marker as <code>dolly link</code>: check, fit and learn resolve the pattern from it</span>
+        </div>
+        <div class="panel-body stack">
+          <div class="toolbar bare">
+            <PathField v-model="linkDir" kind="directory" name="link-dir" placeholder="/path/to/project" title="Choose the project to link" />
+            <button class="primary" type="submit" :disabled="linkBusy || !linkDir">Link</button>
+            <button class="ghost" type="button" @click="linking = false">{{ linked ? "Done" : "Cancel" }}</button>
+          </div>
+          <label class="toggle">
+            <input v-model="vendor" type="checkbox" />
+            Copy the pattern into the project under <code>dolly/</code>, so a checkout carries it for CI and teammates
+          </label>
+          <p v-if="linkError" class="error">{{ linkError }}</p>
+          <span v-else-if="linked" class="note">
+            Linked{{ linked.replaced ? ` (it was linked to "${linked.replaced}")` : "" }}. Commit <code>.dolly</code>{{ linked.vendored ? ` and ${linked.vendored}/` : "" }} so every checkout checks against the same pattern.
+          </span>
+          <span v-else class="note">Without the copy, the pattern stays in this machine's store and a teammate imports the bundle first.</span>
         </div>
       </form>
 
@@ -461,11 +553,16 @@ onMounted(load);
       <template v-else>
         <p v-if="detail.error" class="error">{{ detail.error }}</p>
         <p v-if="saveError" class="error">{{ saveError }}</p>
+        <div v-if="files.length" class="segmented files" style="margin-bottom: 10px">
+          <button type="button" :class="{ on: editing === 'pattern.md' }" :aria-pressed="editing === 'pattern.md'" @click="openFile('pattern.md')">pattern.md</button>
+          <button v-for="file in files" :key="file" type="button" :class="{ on: editing === file }" :aria-pressed="editing === file" @click="openFile(file)">{{ file }}</button>
+        </div>
         <CodeEditor v-model="buffer" />
         <div class="actions-row" style="margin-top: 10px">
           <button class="primary" type="button" :disabled="saving" @click="save">Save</button>
-          <button type="button" :disabled="saving" @click="cancelEdit">Cancel</button>
-          <span class="muted">Validated on save. An invalid pattern is never written.</span>
+          <button type="button" :disabled="saving" @click="cancelEdit">{{ editing === "pattern.md" ? "Cancel" : "Done" }}</button>
+          <span v-if="editing === 'pattern.md'" class="muted">Validated on save. An invalid pattern is never written.</span>
+          <span v-else class="muted">A captured file: your bytes, written as they are.</span>
         </div>
       </template>
     </template>

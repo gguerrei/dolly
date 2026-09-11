@@ -18,7 +18,7 @@ The name is a nod to Dolly the cloned sheep: you clone how you build software.
 
 ## How visual work happens
 
-A maintainer rule since 2026-08-21: anything a person will look at (the mark, a GUI view, an empty state, installer and docs visuals) is designed before it is built, on a Claude Design canvas (`/design`), and approved there. The canvas is the place to compare directions and tweak by hand; code follows the approved board, and the port is reviewed against it. Canvas links are recorded in [docs/design/gui.md](design/gui.md) so a later session can reopen the source of a screen. The brand sheet and the four app views that the 2026-08-21 redesign shipped from are the first entries. Every milestone below that adds a surface names its design step explicitly.
+A maintainer rule since 2026-08-21: anything a person will look at (the mark, a GUI view, an empty state, installer and docs visuals) is designed before it is built, on a Claude Design canvas (`/design`), and approved there. The canvas is the place to compare directions and tweak by hand; code follows the approved board, and the port is reviewed against it. Canvas links are recorded in [docs/design/gui.md](design/gui.md) so a later session can reopen the source of a screen. The brand sheet and the four app views that the 2026-08-21 redesign shipped from are the first entries. Every milestone below that adds a surface names its design step explicitly. One exception, decided 2026-09-10: a small addition to an approved board that reuses its own components and vocabulary (a button, a toggle, a tile, a row action, a panel in the shape of its neighbors) is ported directly and reviewed live; a new surface still goes to the canvas first.
 
 ## Architecture
 

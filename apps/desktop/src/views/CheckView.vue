@@ -11,6 +11,8 @@ const report = ref<CheckReport | null>(null);
 const error = ref("");
 const busy = ref(false);
 const watching = ref(false);
+/** `dolly check --conventions`: the model reads the prose too, with AI on. */
+const conventions = ref(false);
 let dispose: (() => void) | null = null;
 
 async function run(fix: boolean): Promise<void> {
@@ -24,6 +26,7 @@ async function run(fix: boolean): Promise<void> {
     report.value = await api.check(dir.value, {
       pattern: patternName.value || undefined,
       fix,
+      ...(conventions.value ? { conventions: true } : {}),
     });
     if (fix) {
       const n = report.value.fixed.length;
@@ -61,14 +64,34 @@ function toggleWatch(): void {
   watching.value = true;
 }
 
-const fixableCount = computed(() => report.value?.violations.filter((v) => v.fixable).length ?? 0);
+/** `dolly ignore` from the row: the path joins the marker's list, and the check runs again. */
+async function ignore(path: string): Promise<void> {
+  try {
+    await api.ignore(dir.value, [path]);
+    toast("success", `Ignoring ${path} in .dolly.`);
+    await run(false);
+  } catch (cause) {
+    toast("error", cause instanceof Error ? cause.message : String(cause));
+  }
+}
 
-/** A rule panel's count: the violations, and how many of them Fix would take. */
+const fixableCount = computed(() => report.value?.violations.filter((v) => v.fixable).length ?? 0);
+const warningCount = computed(
+  () => report.value?.violations.filter((v) => v.severity === "warning").length ?? 0,
+);
+/** What would fail the check: every violation the marker did not turn down to a warning. */
+const failingCount = computed(() => (report.value?.violations.length ?? 0) - warningCount.value);
+
+/** A rule panel's count: the violations, how many Fix would take, and how many are only warnings. */
 function tally(items: CheckViolation[]): string {
   const fixable = items.filter((v) => v.fixable).length;
+  const warnings = items.filter((v) => v.severity === "warning").length;
   const violations = `${items.length} violation${items.length === 1 ? "" : "s"}`;
-  if (fixable === 0) return violations;
-  return fixable === items.length ? `${violations}, fixable` : `${violations}, ${fixable} fixable`;
+  const parts = [
+    ...(fixable === 0 ? [] : [fixable === items.length ? "fixable" : `${fixable} fixable`]),
+    ...(warnings === 0 ? [] : [warnings === items.length ? "warnings only" : `${warnings} warning${warnings === 1 ? "" : "s"}`]),
+  ];
+  return parts.length ? `${violations}, ${parts.join(", ")}` : violations;
 }
 
 /** Violations grouped by rule, in the engine's reporting order. */
@@ -121,19 +144,28 @@ onBeforeUnmount(() => dispose?.());
         </svg>
         {{ watching ? "Stop watching" : "Watch" }}
       </button>
+      <!-- Same as dolly check --conventions: one model call reads the prose, with AI on; a watcher never calls it. -->
+      <label class="toggle" title="With AI on, the model reads the prose conventions against the files changed since HEAD; reported apart, never counted">
+        <input v-model="conventions" type="checkbox" :disabled="busy || watching" />
+        Conventions
+      </label>
     </form>
 
     <p v-if="error" class="error">{{ error }}</p>
 
     <template v-if="report">
-      <div class="stats">
+      <div class="stats five">
         <div class="stat">
-          <span class="n" :class="{ warm: report.violations.length > 0 }">{{ report.violations.length }}</span>
-          <span class="l">violation{{ report.violations.length === 1 ? "" : "s" }}</span>
+          <span class="n" :class="{ warm: failingCount > 0 }">{{ report.violations.length }}</span>
+          <span class="l">violation{{ report.violations.length === 1 ? "" : "s" }}<template v-if="warningCount">, {{ warningCount }} warning{{ warningCount === 1 ? "" : "s" }}</template></span>
         </div>
         <div class="stat">
           <span class="n">{{ fixableCount }}</span>
           <span class="l">fixable</span>
+        </div>
+        <div class="stat">
+          <span class="n">{{ report.ignored }}</span>
+          <span class="l">ignored by .dolly</span>
         </div>
         <div class="stat">
           <span class="n">{{ report.diagnostics.length }}</span>
@@ -187,7 +219,45 @@ onBeforeUnmount(() => dispose?.());
                 <td><Message :text="violation.message" /></td>
                 <td class="actions">
                   <span v-if="violation.fixable" class="badge">fixable</span>
+                  <span v-if="violation.severity === 'warning'" class="badge">warning</span>
+                  <button
+                    class="ghost small"
+                    type="button"
+                    :disabled="busy || watching"
+                    title="Add this path to the marker's ignore list"
+                    @click="ignore(violation.path)"
+                  >
+                    ignore
+                  </button>
                 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="report.conventions" class="panel">
+          <div class="panel-head">
+            <h3>conventions</h3>
+            <span class="count">as {{ report.conventions.model }} reads them; never counted</span>
+          </div>
+          <table>
+            <tbody>
+              <tr v-if="report.conventions.findings.length === 0" class="row">
+                <td class="path"></td>
+                <td colspan="2">nothing to report</td>
+              </tr>
+              <tr
+                v-for="finding in report.conventions.findings"
+                :key="`${finding.path}:${finding.line ?? ''}:${finding.message}`"
+                class="row"
+              >
+                <td class="path">{{ finding.path }}<template v-if="finding.line">:{{ finding.line }}</template></td>
+                <td>{{ finding.message }}</td>
+                <td class="actions"><span class="badge">{{ report.conventions.model }}</span></td>
+              </tr>
+              <tr v-for="line in report.conventions.skipped" :key="line" class="sub">
+                <td class="path"></td>
+                <td colspan="2">skipped {{ line }}</td>
               </tr>
             </tbody>
           </table>

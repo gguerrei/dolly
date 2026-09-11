@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { api, ApiError, type Pattern, type PatternSummary } from "../api";
 import FacetChips from "../components/FacetChips.vue";
 import PathField from "../components/PathField.vue";
@@ -51,12 +51,17 @@ async function remove(name: string): Promise<void> {
  * the library comes back as a 409 the panel turns into Replace or Keep mine.
  */
 const open = ref<"" | "extract" | "import">("");
-const dir = ref("");
+/** One project, or several to keep what they agree on (`dolly extract a b c --name`). */
+const dirs = ref<string[]>([""]);
 const name = ref("");
 const file = ref("");
 const busy = ref(false);
 /** The pattern name the daemon refused to replace, until Replace or Keep mine. */
 const taken = ref("");
+
+const given = computed(() => dirs.value.map((d) => d.trim()).filter(Boolean));
+/** Several projects need a name: the pattern is nobody's directory. */
+const canExtract = computed(() => given.value.length > 0 && (given.value.length === 1 || name.value !== ""));
 
 function show(panel: "extract" | "import"): void {
   open.value = open.value === panel ? "" : panel;
@@ -67,16 +72,16 @@ function show(panel: "extract" | "import"): void {
 async function extract(force = false): Promise<void> {
   await arrive(
     async () => {
-      const saved = await api.extract(dir.value, name.value, force);
+      const saved = await api.extract(given.value, name.value, force);
       toast(
         "success",
-        `Saved "${saved.name}" (facets: ${saved.facets.join(", ") || "none"}${
+        `Saved "${saved.name}"${given.value.length > 1 ? ` from ${given.value.length} projects` : ""} (facets: ${saved.facets.join(", ") || "none"}${
           saved.captured ? `; ${saved.captured} config${saved.captured === 1 ? "" : "s"} captured` : ""
         }).`,
       );
       return saved.name;
     },
-    name.value || dir.value.split("/").filter(Boolean).pop() || "",
+    name.value || given.value[0]?.split("/").filter(Boolean).pop() || "",
   );
 }
 
@@ -155,8 +160,19 @@ onMounted(load);
         <span class="count">the same inference as <code>dolly extract</code>: nothing is declared, and what falls short of a facet lands in the notes</span>
       </div>
       <div class="panel-body stack">
+        <div v-for="(_, index) in dirs" :key="index" class="toolbar bare">
+          <PathField
+            :model-value="dirs[index] ?? ''"
+            kind="directory"
+            :name="`extract-dir-${index}`"
+            placeholder="/path/to/project"
+            title="Choose a project to learn from"
+            @update:model-value="(value) => (dirs[index] = value)"
+          />
+          <button v-if="dirs.length > 1" class="ghost" type="button" @click="dirs.splice(index, 1)">Remove</button>
+          <button v-if="index === dirs.length - 1" class="ghost" type="button" title="Several projects keep what they agree on" @click="dirs.push('')">Add another project</button>
+        </div>
         <div class="toolbar bare">
-          <PathField v-model="dir" kind="directory" name="extract-dir" placeholder="/path/to/project" title="Choose the project to learn from" />
           <label class="field" data-role="pattern">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3.5" y="3.5" width="7.4" height="7.4" rx="1.6" />
@@ -164,9 +180,9 @@ onMounted(load);
               <rect x="3.5" y="13.1" width="7.4" height="7.4" rx="1.6" />
               <rect x="13.1" y="13.1" width="7.4" height="7.4" rx="1.6" />
             </svg>
-            <input v-model.trim="name" class="mono" name="extract-name" placeholder="name (the directory's by default)" spellcheck="false" />
+            <input v-model.trim="name" class="mono" name="extract-name" :placeholder="given.length > 1 ? 'name (required for several projects)' : 'name (the directory\'s by default)'" spellcheck="false" />
           </label>
-          <button class="primary" type="submit" :disabled="busy || !dir">Extract</button>
+          <button class="primary" type="submit" :disabled="busy || !canExtract">Extract</button>
           <button class="ghost" type="button" @click="open = ''">Cancel</button>
         </div>
         <div v-if="taken" class="callout actions-row">
@@ -176,6 +192,7 @@ onMounted(load);
             <button class="ghost" type="button" @click="taken = ''">Keep mine</button>
           </span>
         </div>
+        <span v-else-if="given.length > 1" class="note">Several projects yield what they agree on; the notes say what they do not.</span>
         <span v-else class="note">The name defaults to the directory's. A pattern that already has it is not replaced without asking.</span>
       </div>
     </form>

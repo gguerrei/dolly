@@ -126,6 +126,26 @@ describe("dolly CLI", () => {
     expect(stderr).toContain("$EDITOR");
   });
 
+  test("edit opens a captured file too, its bytes written as they are", async () => {
+    await seedPattern("tidy", "---\nname: tidy\n---\n");
+    const toolchain = join(home, "patterns", "tidy", "toolchain");
+    await mkdir(toolchain, { recursive: true });
+    await writeFile(join(toolchain, "biome.json"), "{}\n");
+    const editor = await fakeEditor('{ "formatter": {} }\n');
+    const edited = await dollyWithEnv({ EDITOR: editor }, "edit", "tidy", "toolchain/biome.json");
+    expect(edited.exitCode).toBe(0);
+    expect(edited.stdout).toContain('toolchain/biome.json of "tidy" saved');
+    expect(await readFile(join(toolchain, "biome.json"), "utf8")).toBe('{ "formatter": {} }\n');
+    const missing = await dollyWithEnv({ EDITOR: editor }, "edit", "tidy", "toolchain/nope.json");
+    expect(missing.exitCode).toBe(1);
+    expect(missing.stderr).toContain(
+      "has no captured file toolchain/nope.json; it has toolchain/biome.json",
+    );
+    const outside = await dollyWithEnv({ EDITOR: editor }, "edit", "tidy", "../escape");
+    expect(outside.exitCode).toBe(1);
+    expect(outside.stderr).toContain("not a captured file");
+  });
+
   test("an empty $VISUAL does not shadow a working $EDITOR", async () => {
     await seedPattern("tidy", "---\nname: tidy\n---\n");
     const editor = await fakeEditor("---\nname: tidy\ndescription: Via EDITOR.\n---\n");
