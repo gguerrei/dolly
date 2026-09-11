@@ -39,7 +39,7 @@ the button is absent and paths are typed.
 
 ```sh
 bun run tauri dev     # builds the webview, compiles the shell, opens the window (the daemon runs from the checkout)
-bun run tauri build   # builds the webview, compiles dolly as the sidecar, and produces the bundles (.app and .dmg on macOS, deb/rpm/AppImage on Linux, .msi on Windows)
+bun run tauri build   # builds the webview, compiles dolly as the sidecar, and produces the bundles (.app and .dmg on macOS, deb and rpm on Linux, .msi on Windows)
 ```
 
 It needs the Rust toolchain and the platform's webview libraries. On macOS

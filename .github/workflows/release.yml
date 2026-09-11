@@ -54,15 +54,12 @@ jobs:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # libfuse2t64: the AppImage tooling Tauri downloads runs as AppImages itself, which the current runner cannot mount without it.
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2t64
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - run: bun install --frozen-lockfile
       # tauri build runs the webview build and the sidecar script first (tauri.conf.json, beforeBuildCommand).
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # linuxdeploy's strip fails on the current Ubuntu runner, and the AppImage with it.
-          NO_STRIP: true
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
