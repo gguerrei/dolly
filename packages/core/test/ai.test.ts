@@ -3,9 +3,11 @@ import { chmod, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { activeAi, aiOff, aiStatus, connectAi, useAi, verifyAi } from "../src/ai/ai";
+import { assistedCheck } from "../src/ai/check";
 import { findKey, KeychainUnavailableError, storeKey } from "../src/ai/keys";
 import { assistedFit } from "../src/ai/placement";
 import { AiProviderError, complete, verifyKey } from "../src/ai/providers";
+import { patternSchema } from "../src/pattern/schema";
 import { cleanupTempRoots, freshStore, repo, seed } from "./support";
 
 afterAll(cleanupTempRoots);
@@ -400,5 +402,98 @@ describe("semantic placement", () => {
     expect(item?.aiError).toBe(
       "claude-sonnet-5 could not suggest: Anthropic: HTTP 500: overloaded",
     );
+  });
+});
+
+describe("the conventions check", () => {
+  beforeEach(async () => {
+    process.env.DOLLY_HOME = await mkdtemp(join(tmpdir(), "dolly-ai-"));
+  });
+
+  async function git(root: string, ...args: string[]): Promise<void> {
+    const child = Bun.spawn(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe" });
+    if ((await child.exited) !== 0) throw new Error(`git ${args.join(" ")} failed`);
+  }
+
+  async function project() {
+    const store = await freshStore();
+    await store.save({
+      pattern: patternSchema.parse({ name: "tidy", languages: { programming: ["TypeScript"] } }),
+      prose: "Raise domain errors; translate to HTTP at the router layer.",
+    });
+    const root = await repo({
+      "src/router.ts": "throw new Error('http 500');\n",
+      "src/domain.ts": "export {};\n",
+      "README.md": "# tidy\n",
+    });
+    return { store, root };
+  }
+
+  test("with AI off the flag refuses with the connect hint, and without it nothing is called", async () => {
+    const { store, root } = await project();
+    stubFetch(200, {});
+    expect((await assistedCheck(store, "tidy", root)).conventions).toBeUndefined();
+    await expect(assistedCheck(store, "tidy", root, { conventions: true })).rejects.toThrow(
+      "needs the AI layer",
+    );
+    expect(requests.length).toBe(0);
+  });
+
+  test("with AI on, the code files go to the model and its lines about them come back as findings", async () => {
+    const { store, root } = await project();
+    process.env.ANTHROPIC_API_KEY = "sk-c";
+    await useAi("anthropic");
+    stubFetch(200, {
+      content: [
+        {
+          type: "text",
+          text: [
+            "src/router.ts:1: throws a raw Error where the conventions want a domain error.",
+            "- src/domain.ts: exports nothing, but that is not a convention",
+            "src/elsewhere.ts:3: never sent, so never a finding",
+            "nothing",
+          ].join("\n"),
+        },
+      ],
+    });
+    const report = await assistedCheck(store, "tidy", root, { conventions: true });
+    expect(report.conventions).toEqual({
+      model: "claude-sonnet-5",
+      findings: [
+        {
+          path: "src/router.ts",
+          line: 1,
+          message: "throws a raw Error where the conventions want a domain error.",
+        },
+        { path: "src/domain.ts", message: "exports nothing, but that is not a convention" },
+      ],
+      skipped: [],
+    });
+    const body = requests[0]?.body as { messages: Array<{ content: string }> };
+    expect(body.messages[0]?.content).toContain("Raise domain errors");
+    expect(body.messages[0]?.content).toContain("--- src/router.ts");
+    expect(body.messages[0]?.content).not.toContain("README.md"); // docs are not code
+    // The deterministic report stands on its own; the model's section never joins the count.
+    expect(report.violations).toEqual([]);
+  });
+
+  test("under git only the files changed against HEAD are read, and the bounds are said", async () => {
+    const { store, root } = await project();
+    await git(root, "init", "-q");
+    await git(root, "-c", "user.email=a@b", "-c", "user.name=t", "add", "-A");
+    await git(root, "-c", "user.email=a@b", "-c", "user.name=t", "commit", "-q", "-m", "base");
+    await writeFile(join(root, "src/router.ts"), "throw new Error('changed');\n");
+    await writeFile(join(root, "src/big.ts"), `export const big = "${"x".repeat(70 * 1024)}";\n`);
+    process.env.ANTHROPIC_API_KEY = "sk-c";
+    await useAi("anthropic");
+    stubFetch(200, { content: [{ type: "text", text: "nothing" }] });
+    const report = await assistedCheck(store, "tidy", root, { conventions: true });
+    expect(report.conventions?.findings).toEqual([]);
+    expect(report.conventions?.skipped).toEqual([
+      "src/big.ts: 70 KiB is over the 64 KiB one file may be",
+    ]);
+    const body = requests[0]?.body as { messages: Array<{ content: string }> };
+    expect(body.messages[0]?.content).toContain("--- src/router.ts");
+    expect(body.messages[0]?.content).not.toContain("--- src/domain.ts"); // unchanged since HEAD
   });
 });

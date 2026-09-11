@@ -9,6 +9,7 @@ import {
   aiOff,
   aiProviders,
   aiStatus,
+  assistedCheck,
   assistedFit,
   assistedFitApply,
   checkProject,
@@ -208,12 +209,20 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
   }
 
   if (path === "/api/check" && request.method === "POST") {
-    const body = (await request.json()) as { dir?: string; pattern?: string; fix?: boolean };
+    const body = (await request.json()) as {
+      dir?: string;
+      pattern?: string;
+      fix?: boolean;
+      conventions?: boolean;
+    };
     if (!body.dir)
       return json({ error: "`dir` is required: the project directory to check." }, 400);
     const ref = await resolvePattern(store, body.dir, body.pattern);
     if (!ref) return markerHint();
-    const report = await checkProject(ref.store, ref.name, body.dir, { fix: body.fix });
+    // The deterministic report, plus the model's reading of the prose when asked (400 with AI off).
+    const report = body.conventions
+      ? await assistedCheck(ref.store, ref.name, body.dir, { fix: body.fix, conventions: true })
+      : await checkProject(ref.store, ref.name, body.dir, { fix: body.fix });
     return json(checkView(ref.name, report));
   }
 

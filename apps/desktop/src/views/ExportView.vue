@@ -29,7 +29,22 @@ const TARGETS: Target[] = [
     path: ".claude/skills/{name}/SKILL.md",
     why: "Picked up by Claude Code when the pattern applies.",
   },
+  { id: "claude-md", label: "CLAUDE.md", path: "CLAUDE.md", why: "Read by Claude Code at the project root." },
   { id: "cursor", label: "Cursor rule", path: ".cursor/rules/{name}.mdc", why: "Always applied in Cursor." },
+  {
+    id: "copilot",
+    label: "Copilot instructions",
+    path: ".github/copilot-instructions.md",
+    why: "Read by GitHub Copilot in every chat and review.",
+  },
+  { id: "gemini", label: "GEMINI.md", path: "GEMINI.md", why: "Read by Gemini CLI at the project root." },
+  {
+    id: "windsurf",
+    label: "Windsurf rule",
+    path: ".windsurf/rules/{name}.md",
+    why: "Always on in Windsurf.",
+  },
+  { id: "cline", label: "Cline rule", path: ".clinerules/{name}.md", why: "Read by Cline from the rules folder." },
   {
     id: "prompt",
     label: "System prompt",

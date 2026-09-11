@@ -19,6 +19,7 @@ export {
   useAi,
   verifyAi,
 } from "./ai/ai";
+export { type AssistedCheckOptions, assistedCheck } from "./ai/check";
 export { draftConventions } from "./ai/conventions";
 export { assistedFit } from "./ai/placement";
 export { AiProviderError, type AiRequest, PROVIDERS, type ProviderId } from "./ai/providers";

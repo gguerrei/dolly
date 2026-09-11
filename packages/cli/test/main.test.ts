@@ -469,6 +469,19 @@ describe("dolly CLI", () => {
     expect(stderr).toContain(".dolly marker");
   });
 
+  test("check --conventions refuses without the AI layer, and never combines with --watch", async () => {
+    await seedPattern("tidy", "---\nname: tidy\n---\n");
+    const project = join(home, "conv");
+    await mkdir(project, { recursive: true });
+    await writeFile(join(project, ".dolly"), "pattern: tidy\n");
+    const off = await dolly("check", "-C", project, "--conventions");
+    expect(off.exitCode).toBe(1);
+    expect(off.stderr).toContain("needs the AI layer");
+    const watched = await dolly("check", "-C", project, "--conventions", "--watch");
+    expect(watched.exitCode).toBe(1);
+    expect(watched.stderr).toContain("do not combine");
+  });
+
   test("check refuses --fix combined with --watch", async () => {
     await seedPattern("tidy", "---\nname: tidy\n---\n");
     const { stderr, exitCode } = await dolly("check", "tidy", "--fix", "--watch");
@@ -528,7 +541,9 @@ describe("dolly CLI", () => {
 
     const unknown = await dolly("export", "tidy", "--as", "vim");
     expect(unknown.exitCode).toBe(1);
-    expect(unknown.stderr).toContain("bundle, claude-skill, cursor, agents-md, prompt");
+    expect(unknown.stderr).toContain(
+      "bundle, claude-skill, claude-md, cursor, agents-md, copilot, gemini, windsurf, cline, prompt",
+    );
   });
 
   test("ai: off by default, on with an env key, off again on request", async () => {
