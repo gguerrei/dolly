@@ -17,6 +17,7 @@ import {
   dollyHome,
   draftConventions,
   EXPORT_TARGETS,
+  editMarker,
   exportPattern,
   extractFromRepos,
   extractPattern,
@@ -36,6 +37,9 @@ import {
   parsePatternDocument,
   pathLabel,
   pruneSources,
+  RULE_IDS,
+  type RuleId,
+  readMarker,
   renderExport,
   renderProposal,
   resolvePattern,
@@ -270,13 +274,47 @@ program
   .command("ignore")
   .argument("<paths...>", "relative paths, with * and **, that check leaves alone")
   .option("-C, --dir <dir>", "project directory whose marker to edit", ".")
+  .option("--remove", "take the paths off the list instead")
   .description(
     "Add paths to the .dolly marker's ignore list: known violations set aside, counted, never fixed.",
   )
-  .action(async (paths: string[], options: { dir: string }) => {
-    const marker = await ignorePaths(options.dir, paths);
+  .action(async (paths: string[], options: { dir: string; remove?: boolean }) => {
+    const marker = await ignorePaths(options.dir, paths, { remove: options.remove });
     console.log(
-      `Ignoring ${marker.ignore.length} path${marker.ignore.length === 1 ? "" : "s"} in ${options.dir}: ${marker.ignore.join(", ")}.`,
+      marker.ignore.length === 0
+        ? `Ignoring nothing in ${options.dir}.`
+        : `Ignoring ${marker.ignore.length} path${marker.ignore.length === 1 ? "" : "s"} in ${options.dir}: ${marker.ignore.join(", ")}.`,
+    );
+  });
+
+program
+  .command("rules")
+  .argument(
+    "[settings...]",
+    "rule=on|warn|off, e.g. naming=warn hooks=off; none prints the settings",
+  )
+  .option("-C, --dir <dir>", "project directory whose marker to edit", ".")
+  .description(
+    "Turn a rule off or down to a warning in the .dolly marker; on is the default and clears the setting.",
+  )
+  .action(async (settings: string[], options: { dir: string }) => {
+    const rules = { ...((await readMarker(options.dir))?.rules ?? {}) };
+    for (const setting of settings) {
+      const [rule, level] = setting.split("=") as [string, string | undefined];
+      if (!(RULE_IDS as readonly string[]).includes(rule)) {
+        throw new Error(`Unknown rule "${rule}"; one of: ${RULE_IDS.join(", ")}.`);
+      }
+      if (level !== "on" && level !== "warn" && level !== "off") {
+        throw new Error(`"${setting}" is not rule=on|warn|off.`);
+      }
+      if (level === "on") delete rules[rule as RuleId];
+      else rules[rule as RuleId] = level;
+    }
+    const marker = settings.length > 0 ? await editMarker(options.dir, { rules }) : undefined;
+    const set = Object.entries(marker?.rules ?? rules).map(([rule, level]) => `${rule} ${level}`);
+    const on = RULE_IDS.length - set.length;
+    console.log(
+      `Rules in ${options.dir}: ${set.length === 0 ? `all ${on} on` : `${set.join(", ")}; ${on} on`}.`,
     );
   });
 

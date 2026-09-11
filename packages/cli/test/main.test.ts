@@ -327,6 +327,30 @@ describe("dolly CLI", () => {
     expect(await readFile(join(project, ".dolly"), "utf8")).toContain("  - shell/*.fish\n");
   });
 
+  test("ignore --remove and rules edit the marker, and say what it holds", async () => {
+    await seedPattern("tidy", ["---", "name: tidy", "---"].join("\n"));
+    const project = join(home, "ruled");
+    await mkdir(project, { recursive: true });
+    await dolly("link", "tidy", "-C", project);
+    await dolly("ignore", "legacy/", "shell/*.fish", "-C", project);
+    const removed = await dolly("ignore", "--remove", "legacy/", "-C", project);
+    expect(removed.stdout).toContain(`Ignoring 1 path in ${project}: shell/*.fish.`);
+    const set = await dolly("rules", "naming=warn", "hooks=off", "-C", project);
+    expect(set.exitCode).toBe(0);
+    expect(set.stdout).toContain(`Rules in ${project}: naming warn, hooks off; 8 on.`);
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe(
+      "pattern: tidy\nignore:\n  - shell/*.fish\nrules:\n  naming: warn\n  hooks: off\n",
+    );
+    expect((await dolly("rules", "naming=on", "-C", project)).stdout).toContain("hooks off; 9 on.");
+    expect((await dolly("rules", "-C", project)).stdout).toContain("hooks off; 9 on.");
+    const unknown = await dolly("rules", "nope=off", "-C", project);
+    expect(unknown.exitCode).toBe(1);
+    expect(unknown.stderr).toContain('Unknown rule "nope"');
+    const loud = await dolly("rules", "naming=loud", "-C", project);
+    expect(loud.exitCode).toBe(1);
+    expect(loud.stderr).toContain("is not rule=on|warn|off");
+  });
+
   test("check --json prints the daemon's wire shape, the ignored count included", async () => {
     await seedPattern(
       "tidy",

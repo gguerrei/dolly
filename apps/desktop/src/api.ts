@@ -55,6 +55,31 @@ export interface PatternDetail {
   error?: string;
 }
 
+/** Every rule, in the engine's reporting order: what the marker's `rules` may name. */
+export const RULE_IDS = [
+  "layout",
+  "naming",
+  "config",
+  "commands",
+  "license",
+  "testing",
+  "hooks",
+  "env",
+  "languages",
+  "releases",
+] as const;
+
+export type RuleSetting = "off" | "warn";
+
+/** The `.dolly` marker: the pattern, where it lives, and the project's own word on the rules. */
+export interface Marker {
+  pattern: string;
+  source?: string;
+  sha256?: string;
+  ignore: string[];
+  rules: Partial<Record<(typeof RULE_IDS)[number], RuleSetting>>;
+}
+
 export interface CheckViolation {
   rule: string;
   path: string;
@@ -268,6 +293,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ dir, paths }),
     }),
+  /** The project's marker as data; a directory without one is a 404. */
+  marker: (dir: string) => request<Marker>(`/api/marker?dir=${encodeURIComponent(dir)}`),
+  /** `dolly ignore --remove` and `dolly rules`: the ignore list or the rules replaced whole. */
+  editMarker: (dir: string, edit: { ignore?: string[]; rules?: Marker["rules"] }) =>
+    request<Marker>("/api/marker", { method: "POST", body: JSON.stringify({ dir, ...edit }) }),
   /** A pattern's captured files (configs and templates), pattern-relative. */
   listPatternFiles: (name: string) =>
     request<string[]>(`/api/patterns/${encodeURIComponent(name)}/files`),

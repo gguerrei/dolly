@@ -295,6 +295,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   members' vote, role by role, the dissenters named in the notes; a
   pattern's ecosystem is read from its package manager first, and `new`
   writes no manifest at the root when the layout keeps it in each member.
+- The marker is edited in place: `dolly ignore --remove`, a `dolly rules`
+  verb (`naming=warn hooks=off`, `on` clears), `POST /api/marker`, and a
+  `.dolly` panel in the check view with the ignored paths and the ten rules
+  as three-state rows.
 
 ### Changed
 
