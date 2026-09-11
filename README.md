@@ -35,7 +35,7 @@ dolly is a local-first tool that captures how a project is organized, from lint 
 
 Details and milestones live in [docs/PLAN.md](docs/PLAN.md).
 
-- Going public: the first public push and the v0.1.0 tag, which the [release workflow](.github/workflows/release.yml) turns into the single-file binaries (GUI embedded), the npm package, and the desktop installers with the compiled daemon as their sidecar (`bun run build:binary`, `bun run build:npm`, `bun run tauri build`; the steps are in [docs/RELEASING.md](docs/RELEASING.md)); a Homebrew tap; docs visuals
+- Going public: the first public push and the v0.1.0 tag, which the [release workflow](.github/workflows/release.yml) turns into the single-file binaries (GUI embedded), the two npm packages, and the desktop installers with the compiled daemon as their sidecar (`bun run build:binary`, `bun run build:npm`, `bun run tauri build`; the steps are in [docs/RELEASING.md](docs/RELEASING.md)); a Homebrew tap; docs visuals
 
 ## Development
 

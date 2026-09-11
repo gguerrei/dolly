@@ -499,6 +499,7 @@ describe("the conventions check", () => {
 });
 
 describe.skipIf(process.platform !== "win32")("keys on windows", () => {
+  // Each seal and each read starts PowerShell, which a cold runner does in seconds.
   test("a key seals through DPAPI into dolly's home and reads back, never as plaintext", async () => {
     process.env.DOLLY_HOME = await mkdtemp(join(tmpdir(), "dolly-dpapi-"));
     await storeKey("openai", "sk-sealed-key");
@@ -508,5 +509,5 @@ describe.skipIf(process.platform !== "win32")("keys on windows", () => {
     expect(sealed.toString("latin1")).not.toContain("sk-sealed-key");
     await storeKey("openai", "sk-replaced");
     expect((await findKey("openai"))?.key).toBe("sk-replaced");
-  });
+  }, 30_000);
 });
