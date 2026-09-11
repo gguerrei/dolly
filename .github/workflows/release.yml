@@ -67,7 +67,8 @@ jobs:
           releaseDraft: true
 
   release:
-    needs: binaries
+    # After the installers too, so the binaries join the draft tauri-action opened instead of a second one.
+    needs: [binaries, installers]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
