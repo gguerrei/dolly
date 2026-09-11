@@ -9,7 +9,7 @@ Thanks for your interest in dolly! The project is pre-0.1 and under heavy develo
 ## Getting started
 
 ```sh
-git clone <repo-url> dolly
+git clone https://github.com/gguerrei/dolly.git
 cd dolly
 bun install
 bun test
