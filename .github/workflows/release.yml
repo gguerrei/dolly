@@ -60,6 +60,8 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # linuxdeploy's strip fails on the current Ubuntu runner, and the AppImage with it.
+          NO_STRIP: true
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
