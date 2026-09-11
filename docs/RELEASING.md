@@ -17,6 +17,15 @@ the maintainer's hands.
   (`#!/usr/bin/env bun`). The engine and commander are bundled in, so the
   published package declares no runtime dependencies. The desktop bundles
   carry the same two files as resources.
+- **The npm package `@dollysheep/core`**: the engine as a library, for
+  editors and build steps. `bun run build:core` bundles `packages/core/src`
+  into `packages/core/dist/index.js` (its dependencies external and declared,
+  `--target=bun` since the engine reads and writes through bun's own APIs),
+  emits the declarations beside it (`tsconfig.build.json`), and
+  `packages/core/scripts/pack.ts` writes the manifest, the README and the
+  notices into `dist/`, which is the package: it publishes from there, so the
+  source manifest keeps pointing at `src/` for the monorepo. The CLI bundles
+  the engine in, so nothing at runtime couples the two packages.
 - **The desktop installers** (`.dmg`, `.deb`, `.AppImage`, `.msi`): `bun run
   tauri build` in `apps/desktop`. Its `beforeBuildCommand` builds the webview
   and `packages/cli/scripts/build-sidecar.ts`, which compiles the binary as
@@ -33,8 +42,9 @@ the maintainer's hands.
 2. Tag it: `git tag v0.1.0 && git push origin v0.1.0`.
 3. The [release workflow](../.github/workflows/release.yml) builds the three
    binaries and the installers, opens a **draft** release carrying them, and
-   publishes `dollysheep` to npm when the repository has an `NPM_TOKEN`
-   secret (it says so and skips when it does not).
+   publishes `@dollysheep/core` and then `dollysheep` to npm when the
+   repository has an `NPM_TOKEN` secret (it says so and skips when it does
+   not).
 4. Read the draft, then publish it.
 5. Homebrew: copy `packaging/homebrew/dolly.rb` into the tap
    (`gguerrei/homebrew-dolly`, `Formula/dolly.rb`), set `version` and the two

@@ -299,6 +299,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verb (`naming=warn hooks=off`, `on` clears), `POST /api/marker`, and a
   `.dolly` panel in the check view with the ignored paths and the ten rules
   as three-state rows.
+- The engine publishes as `@dollysheep/core`, a library build with
+  declarations that `bun run build:core` puts under `packages/core/dist`;
+  the release workflow publishes it before the CLI.
 
 ### Changed
 
