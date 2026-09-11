@@ -164,7 +164,26 @@ describe("the targets", () => {
       'You are working in a project organized by the "tidy-service" pattern: A tidy HTTP service. Follow these conventions exactly.\n\n',
     );
 
-    for (const rendered of [skill, cursor, agents, prompt]) {
+    // The plain files other agents read at a fixed path wear the AGENTS.md frame.
+    const plain = {
+      "claude-md": "CLAUDE.md",
+      copilot: ".github/copilot-instructions.md",
+      gemini: "GEMINI.md",
+      cline: ".clinerules/tidy-service.md",
+    } as const;
+    const fixed = Object.entries(plain).map(([target, path]) => {
+      const rendered = renderExport(FULL, target as keyof typeof plain);
+      expect(rendered.path).toBe(path);
+      expect(rendered.contents).toBe(agents.contents);
+      return rendered;
+    });
+    const windsurf = renderExport(FULL, "windsurf");
+    expect(windsurf.path).toBe(".windsurf/rules/tidy-service.md");
+    expect(windsurf.contents).toStartWith(
+      "---\ntrigger: always_on\ndescription: A tidy HTTP service.\n---\n\n# tidy-service\n\n",
+    );
+
+    for (const rendered of [skill, cursor, agents, prompt, windsurf, ...fixed]) {
       expect(rendered.contents).toEndWith(`\n\n${brief}\n`);
     }
   });

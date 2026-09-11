@@ -12,7 +12,18 @@ import { exportBundle } from "./bundle";
  * (docs/design/exports.md); the bundle is the M1 zip, kept as the default
  * so the verb reads as it always did.
  */
-export const EXPORT_TARGETS = ["bundle", "claude-skill", "cursor", "agents-md", "prompt"] as const;
+export const EXPORT_TARGETS = [
+  "bundle",
+  "claude-skill",
+  "claude-md",
+  "cursor",
+  "agents-md",
+  "copilot",
+  "gemini",
+  "windsurf",
+  "cline",
+  "prompt",
+] as const;
 export type ExportTarget = (typeof EXPORT_TARGETS)[number];
 export type TextTarget = Exclude<ExportTarget, "bundle">;
 
@@ -45,6 +56,8 @@ export function renderExport(doc: PatternDocument, target: TextTarget): Rendered
     path,
     contents: `${parts.join("\n\n").trimEnd()}\n`,
   });
+  // The plain files agents read at a fixed path share one frame: the heading, where the file came from, the brief.
+  const exported = `Exported by dolly from the \`${name}\` pattern; edit the pattern (\`dolly edit ${name}\`) and export again rather than editing here.`;
   switch (target) {
     case "claude-skill":
       return file(
@@ -56,6 +69,8 @@ export function renderExport(doc: PatternDocument, target: TextTarget): Rendered
         heading,
         brief,
       );
+    case "claude-md":
+      return file("CLAUDE.md", heading, exported, brief);
     case "cursor":
       return file(
         `.cursor/rules/${name}.mdc`,
@@ -64,12 +79,20 @@ export function renderExport(doc: PatternDocument, target: TextTarget): Rendered
         brief,
       );
     case "agents-md":
+      return file("AGENTS.md", heading, exported, brief);
+    case "copilot":
+      return file(".github/copilot-instructions.md", heading, exported, brief);
+    case "gemini":
+      return file("GEMINI.md", heading, exported, brief);
+    case "windsurf":
       return file(
-        "AGENTS.md",
+        `.windsurf/rules/${name}.md`,
+        frontmatter({ trigger: "always_on", description }),
         heading,
-        `Exported by dolly from the \`${name}\` pattern; edit the pattern (\`dolly edit ${name}\`) and export again rather than editing here.`,
         brief,
       );
+    case "cline":
+      return file(`.clinerules/${name}.md`, heading, exported, brief);
     case "prompt":
       return file(
         `${name}.prompt.md`,

@@ -7,6 +7,7 @@ import {
   type AiStatus,
   aiOff,
   aiStatus,
+  assistedCheck,
   assistedFit,
   assistedFitApply,
   type CheckReport,
@@ -125,15 +126,30 @@ program
   .option("--fix", "apply safe autofixes (create, append, merge, never delete)")
   .option("--watch", "re-run whenever the project changes")
   .option("--json", "print the report as JSON (one line per report under --watch)")
+  .option(
+    "--conventions",
+    "with AI on, have the model read the prose conventions against the changed code files (reported apart, never counted)",
+  )
   .description("Check a project against its pattern.")
   .action(
     async (
       patternArg: string | undefined,
-      options: { dir: string; fix?: boolean; watch?: boolean; json?: boolean },
+      options: {
+        dir: string;
+        fix?: boolean;
+        watch?: boolean;
+        json?: boolean;
+        conventions?: boolean;
+      },
     ) => {
       if (options.fix && options.watch) {
         throw new Error(
           "--watch and --fix do not combine: a watcher that edits the tree it watches is a feedback loop.",
+        );
+      }
+      if (options.conventions && options.watch) {
+        throw new Error(
+          "--watch and --conventions do not combine: a watcher would call the model on every save.",
         );
       }
       const ref = await resolvePattern(new PatternStore(), options.dir, patternArg);
@@ -148,7 +164,10 @@ program
           ? console.log(JSON.stringify(checkView(name, report)))
           : printCheckReport(name, report);
       if (!options.watch) {
-        const report = await checkProject(store, name, options.dir, { fix: options.fix });
+        // The deterministic report, plus the model's reading of the prose when asked.
+        const report = options.conventions
+          ? await assistedCheck(store, name, options.dir, { fix: options.fix, conventions: true })
+          : await checkProject(store, name, options.dir, { fix: options.fix });
         print(report);
         if (failing(report)) process.exitCode = 1;
         return;
