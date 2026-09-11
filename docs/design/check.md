@@ -45,16 +45,32 @@ meant to be committed so the whole team checks against the same pattern:
 
 ```yaml
 pattern: fastapi-service
+source: dolly
 ignore:
   - shell/*.fish
   - legacy/
+rules:
+  naming: warn
+  hooks: off
 ```
 
 `dolly check` resolves the pattern in this order: an explicit argument beats
-the marker, the marker beats nothing, and with neither the command errors
-with a hint to pass a name. A marker naming a pattern this machine does not
-have degrades to the same hint (patterns are local; a teammate imports the
-bundle first). A marker that does not parse is a diagnostic, never silence.
+the marker and reads the machine's store, a marker with a `source` reads the
+pattern from there, a marker without one reads the store, and with nothing
+the command errors with a hint to pass a name. Every verb that takes a
+project (check, fit, learn, the daemon's routes) resolves through the one
+function in `marker.ts`. A marker that does not parse is a diagnostic, never
+silence.
+
+`source` (added 2026-09-10) is how a checkout carries its own pattern, so
+CI and a teammate's clone check without importing anything. `dolly link
+<pattern> --vendor` copies the pattern directory into the project under
+`dolly/<pattern>/` (the store's own layout, so every code path reads it as
+a store rooted at `dolly/`) and writes `source: dolly`; linking again
+without `--vendor` drops the source, since the store is the pattern's home
+again. A `source` may also be an https URL to a `.dolly` bundle, fetched
+into a temporary store for the run under the same caps as `dolly import`,
+and refused when the bundle names a different pattern than the marker.
 
 `ignore` (added 2026-09-01) is the project's own word on which paths check
 leaves alone: a mandated kebab-case script in a snake_case repo, a legacy
@@ -63,8 +79,19 @@ directory entry covers everything under it. An ignored violation is neither
 reported nor fixed, every rule honors the list, and the report carries the
 count (`ignored`), so a clean run still says what it set aside. Fit plans
 in check's currency, so it never plans a move or a fix for an ignored path.
-`dolly check --json` prints the report in the daemon's wire shape, one
-line per report under `--watch`, for CI and editors.
+`dolly ignore <paths...>` appends to the list from the terminal, and the
+check view's rows do the same. `rules` (added 2026-09-10) turns a rule
+`off` (its violations dropped and counted with the ignored) or down to
+`warn` (reported with a warning severity, `[warning]` in the CLI and a badge
+in the GUI, never counted toward exit 1). `dolly check --json` prints the
+report in the daemon's wire shape, one line per report under `--watch`,
+for CI and editors.
+
+With the AI layer on, `dolly check --conventions` adds the one thing the
+rules cannot judge: the prose conventions, read by the model against the
+code files changed since HEAD ([ai.md](ai.md), "The conventions check").
+The findings print in their own section, labeled with the model, and never
+change the exit code.
 
 ## Config binding
 

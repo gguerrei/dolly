@@ -55,7 +55,7 @@ that does not validate).
 | `GET /api/patterns/:name` | `PatternStore` + `parsePatternDocument` | raw `source` always; parsed `pattern` + `prose`, or `error` when invalid (the editor needs broken patterns most) |
 | `PUT /api/patterns/:name` | `parsePatternDocument` + verbatim write | `dolly edit` over HTTP: body is raw source, validated first; valid source is written byte-for-byte (the author's formatting is theirs), invalid is 422 with the parse error and nothing written |
 | `DELETE /api/patterns/:name` | `PatternStore.delete` | |
-| `POST /api/check` | `checkProject` (+ `readPatternMarker`) | `{ dir, pattern?, fix? }`; pattern falls back to the project's `.dolly` marker, same resolution order as the CLI |
+| `POST /api/check` | `checkProject`, or `assistedCheck` with `conventions` (+ `resolvePattern`) | `{ dir, pattern?, fix?, conventions? }`; pattern falls back to the project's `.dolly` marker (its `source` picks the store), same resolution order as the CLI; `conventions: true` adds the model's reading of the prose, a 400 with AI off |
 | `POST /api/fit` | `assistedFit` / `assistedFitApply` (+ `gitStateOf`) | `{ dir, pattern?, apply? }`; the `FitPlan` is data end to end, so it crosses the wire as itself (each fix step with its `preview`, the patch as a unified diff), plus `git` so the UI can gate Apply; with AI on, declined items may carry a `suggestion` and steps may be `translate`; apply's git preconditions come back as 409 |
 | `GET /api/ai/providers` | `aiProviders` | every provider with its label, default model, and where its key lives |
 | `POST /api/ai/connect` | `connectAi` | `{ provider, key }`: verified live, then stored in the OS keychain; the provider's refusal is a 400 in its words |
@@ -69,7 +69,8 @@ that does not validate).
 | `POST /api/extract` | `extractPattern` or `extractFromRepos` + `saveExtractedPattern` | `{ dir, name?, force? }`, or `{ dirs, name, force? }` to keep what several projects agree on: what was saved, the way `dolly extract` says it; an existing name is 409 until `force` |
 | `POST /api/new` | `scaffoldProject` | `{ pattern, dir }`: the `ScaffoldReport`; a directory that is not empty is 409 |
 | `POST /api/import` | `importBundle` | `{ file, force? }`: the pattern the bundle held, from a path or an https URL; an existing name is 409 until `force`, a file that is not a bundle 400 |
-| `POST /api/link` | `linkProject` | `{ dir, pattern }`: `dolly link` over the wire; the marker written, an ignore list already there kept, and `replaced` naming the pattern the project was linked to before |
+| `POST /api/link` | `linkProject` | `{ dir, pattern, vendor? }`: `dolly link` over the wire; the marker written, an ignore list and rule settings already there kept, `replaced` naming the pattern the project was linked to before, and with `vendor` the pattern copied into the project (`vendored` names the directory) |
+| `POST /api/ignore` | `ignorePaths` | `{ dir, paths }`: `dolly ignore` over the wire; the paths appended to the marker's ignore list, the marker returned whole |
 | `GET /api/watch?dir&pattern` | `watchProject` | a held-open response streaming one JSON report per line (NDJSON, not SSE: `EventSource` cannot send the auth header, `fetch` can); closing the request disposes the watcher |
 
 The check view strips each violation to

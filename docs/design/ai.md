@@ -81,6 +81,28 @@ Review is per proposal: the CLI renders each one as the unified diff it would ma
 
 The third consumer, scoped by the maintainer on 2026-08-22 as full translation behind apply and designed in [docs/design/translation.md](translation.md) with its own [ADR-0004](../adr/0004-translation-behind-apply.md). It is the one consumer where the model produces content the deterministic engine cannot, so ground rule 3 is restated for it rather than broken: the `languages` check rule and fit's planner decide which files, to which language, at which paths; the model fills in the bytes of each file under `--apply` only; and the pattern's own `typecheck` and `test` commands judge the result before a single source file is removed or anything is committed. With the layer off, translate steps are declined with the connect hint.
 
+## The conventions check (v1)
+
+The fourth consumer (2026-09-10). The deterministic rules judge the facets;
+the prose conventions ("raise domain errors, translate to HTTP at the router
+layer") were only ever exported, never checked. `dolly check --conventions`
+(and the check view's Conventions toggle, `conventions: true` on `POST
+/api/check`) asks the model to read them: `assistedCheck` in `ai/check.ts`
+wraps `checkProject`, so the deterministic path never imports the layer, and
+with the layer off the flag refuses with the connect hint.
+
+One call per check. The prompt carries the pattern's prose and the code
+files changed against HEAD (untracked included; every code file when there
+is no git to ask), each in full, under three bounds that are part of the
+contract: at most 25 files, 64 KiB per file, and 200 KiB in all, with every
+file left out named in the report's `skipped` list and its reason. The reply
+is one line per finding, `path:line: message`, and a line naming a file that
+was not sent is not a finding. What comes back rides the report as
+`conventions` (the model, the findings, the skipped files): its own section
+in the CLI and the GUI, labeled as the model's reading, never counted toward
+the exit code, and never fixed. `--watch` refuses the flag, since a watcher
+would call the model on every save.
+
 ## Testing
 
 Adapters run against a stubbed `fetch`: each provider's request shape (URL, auth header, body) is asserted outbound and its response shape unwrapped inbound, plus the error path with the provider's message surfaced and the key absent from it. Key handling runs against a fake `secret-tool` on `PATH` in a temp dir, covering store, lookup, env precedence, and the missing-tool refusal. The switch is exercised end to end under a temp `DOLLY_HOME`: use without a key refuses, use with an env key writes the file, off deletes it, `activeAi()` returns null exactly when the file is gone. The CLI walk covers status output in both states. No test ever talks to a real provider; `connect`'s live verification is covered by pointing the adapter at the stub. Placement runs against a real ambiguous fixture: off means fitProject's plan verbatim with zero calls, on attaches the labeled pick, a pick outside the candidates is discarded, and a provider failure changes nothing. Translation runs against a small Python project under a TypeScript pattern: the dry run lists translate steps with their byte count, AI off declines them, a stubbed well-formed reply is written, verified by the pattern's commands, committed, and leaves check clean, and a malformed reply or a failing verification commits nothing and keeps every original. Learning runs against a real extracted fixture that is then edited: drift yields exactly the proposals the edits warrant (and none when the project matches its pattern), applying them round-trips through the serializer with prose kept, a drifted config capture writes its new bytes, the conventions call sends the changed files and keeps only bullet lines, and the CLI walk covers `--once --yes` writing and a non-interactive `--once` writing nothing.

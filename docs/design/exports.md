@@ -89,8 +89,13 @@ one.
 |---|---|---|
 | `bundle` | `<name>.dolly` | the M1 zip of the pattern directory, unchanged |
 | `claude-skill` | `.claude/skills/<name>/SKILL.md` | frontmatter `name` and `description` (when to use it), then the brief |
+| `claude-md` | `CLAUDE.md` | the `agents-md` frame, at the file Claude Code reads |
 | `cursor` | `.cursor/rules/<name>.mdc` | frontmatter `description` and `alwaysApply: true`, then the brief |
-| `agents-md` | `AGENTS.md` | the brief under a heading naming the pattern |
+| `agents-md` | `AGENTS.md` | the brief under a heading naming the pattern, and a line saying where it came from |
+| `copilot` | `.github/copilot-instructions.md` | the `agents-md` frame, at the file GitHub Copilot reads |
+| `gemini` | `GEMINI.md` | the `agents-md` frame, at the file Gemini CLI reads |
+| `windsurf` | `.windsurf/rules/<name>.md` | frontmatter `trigger: always_on` and `description`, then the brief |
+| `cline` | `.clinerules/<name>.md` | the `agents-md` frame, in the folder Cline reads |
 | `prompt` | `<name>.prompt.md` | one opening line ("You are working in a project organized by ...") then the brief |
 
 The brief, in order, skipping facets the pattern lacks: languages (with
