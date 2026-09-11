@@ -38,7 +38,6 @@ import {
   pathLabel,
   pruneSources,
   RULE_IDS,
-  type RuleId,
   readMarker,
   renderExport,
   renderProposal,
@@ -300,15 +299,14 @@ program
   .action(async (settings: string[], options: { dir: string }) => {
     const rules = { ...((await readMarker(options.dir))?.rules ?? {}) };
     for (const setting of settings) {
-      const [rule, level] = setting.split("=") as [string, string | undefined];
-      if (!(RULE_IDS as readonly string[]).includes(rule)) {
-        throw new Error(`Unknown rule "${rule}"; one of: ${RULE_IDS.join(", ")}.`);
-      }
+      const [rule, level] = setting.split("=");
+      const id = RULE_IDS.find((known) => known === rule);
+      if (!id) throw new Error(`Unknown rule "${rule}"; one of: ${RULE_IDS.join(", ")}.`);
       if (level !== "on" && level !== "warn" && level !== "off") {
         throw new Error(`"${setting}" is not rule=on|warn|off.`);
       }
-      if (level === "on") delete rules[rule as RuleId];
-      else rules[rule as RuleId] = level;
+      if (level === "on") delete rules[id];
+      else rules[id] = level;
     }
     const marker = settings.length > 0 ? await editMarker(options.dir, { rules }) : undefined;
     const set = Object.entries(marker?.rules ?? rules).map(([rule, level]) => `${rule} ${level}`);

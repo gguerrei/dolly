@@ -406,6 +406,7 @@ describe("dolly CLI", () => {
     expect(await Bun.file(join(project, "src", "app.ts")).text()).toContain('"./my-helper"');
 
     const settled = await dolly("fit", "-C", project);
+    expect(settled.stderr).toBe("");
     expect(settled.stdout).toContain("Nothing to fit");
   });
 

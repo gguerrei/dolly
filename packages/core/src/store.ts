@@ -58,7 +58,7 @@ export class PatternStore {
     try {
       entries = await readdir(this.root, { withFileTypes: true });
     } catch {
-      return []; // No store directory yet simply means no patterns.
+      return []; // No store directory yet means no patterns.
     }
 
     const summaries: PatternSummary[] = [];
@@ -72,7 +72,7 @@ export class PatternStore {
         if (error instanceof PatternParseError) {
           summaries.push({ name: entry.name, description: "", error: error.message });
         }
-        // Anything else (no pattern.md, junk directory name) is simply not a pattern.
+        // Anything else (no pattern.md, junk directory name) is not a pattern.
       }
     }
     return summaries.sort((a, b) => a.name.localeCompare(b.name));

@@ -87,7 +87,7 @@ function zsh(verbs: Verb[]): string {
         )
         .join("\n");
       const names = verb.subcommands
-        .map((s) => q(`${s.name}:${s.description.replace(/:/g, " ")}`))
+        .map((s) => q(`${s.name}:${s.description.replace(/:/g, ";")}`))
         .join(" ");
       return `    ${verb.name})
       local -a subcommands
@@ -99,7 +99,7 @@ ${inner}
       esac ;;`;
     })
     .join("\n");
-  const commands = verbs.map((v) => q(`${v.name}:${v.description.replace(/:/g, " ")}`)).join(" ");
+  const commands = verbs.map((v) => q(`${v.name}:${v.description.replace(/:/g, ";")}`)).join(" ");
   return `#compdef dolly
 # dolly completions for zsh. Install with:
 #   dolly completions zsh > "\${fpath[1]}/_dolly" && compinit

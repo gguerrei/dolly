@@ -96,7 +96,7 @@ docs/           # plan, ADRs, design notes
 
 ## Contributing
 
-Contributions are welcome, even this early: issues, ideas, and PRs alike. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and conventions (Conventional Commits), and note that the [Code of Conduct](CODE_OF_CONDUCT.md) applies everywhere in the project.
+Contributions are welcome, even this early: issues, ideas, and PRs alike. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and conventions (Conventional Commits); the [Code of Conduct](CODE_OF_CONDUCT.md) applies everywhere in the project.
 
 ## License
 
