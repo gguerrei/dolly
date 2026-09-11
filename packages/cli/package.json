@@ -1,6 +1,6 @@
 {
   "name": "dollysheep",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "type": "module",
   "description": "dolly: save the way you build software as a pattern, then apply it anywhere. The command line, the local daemon, and the GUI it serves.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@dollysheep/desktop",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "dolly's GUI: a webview served by `dolly serve`, wrapped by Tauri later.",
