@@ -83,10 +83,12 @@ export {
   watchLearning,
 } from "./learn/learn";
 export {
+  editMarker,
   ignorePaths,
   linkProject,
   MARKER_FILE,
   type Marker,
+  type MarkerEdit,
   MarkerError,
   type PatternRef,
   pruneSources,

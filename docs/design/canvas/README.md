@@ -18,6 +18,7 @@ can be re-seeded from the repo.
 | Flows | `LibraryExtract`, `LibraryImport`, `PatternNew` |
 | Conventions | `PatternProse` (the pattern view with its conventions panel rendered from markdown; approved and ported 2026-09-01) |
 | Previews | `FitPreview` (the fit view with each fix's patch under its row; approved and ported 2026-09-01) |
+| Marker | `CheckMarker` (the check view with the `.dolly` panel under its toolbar: the ignored paths with a remove action and the ten rules as three-state rows; drawn and ported 2026-09-11, on the canvas once it is re-seeded) |
 
 Each board is a plain HTML fragment inside `<x-dc>`, styled inline in the
 palette of `apps/desktop/src/theme.css`; open one in a browser to see it (the

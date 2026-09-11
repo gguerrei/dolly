@@ -86,11 +86,18 @@ directory entry covers everything under it. An ignored violation is neither
 reported nor fixed, every rule honors the list, and the report carries the
 count (`ignored`), so a clean run still says what it set aside. Fit plans
 in check's currency, so it never plans a move or a fix for an ignored path.
-`dolly ignore <paths...>` appends to the list from the terminal, and the
-check view's rows do the same. `rules` (added 2026-09-10) turns a rule
-`off` (its violations dropped and counted with the ignored) or down to
-`warn` (reported with a warning severity, `[warning]` in the CLI and a badge
-in the GUI, never counted toward exit 1). `dolly check --json` prints the
+`dolly ignore <paths...>` appends to the list from the terminal (`--remove`
+takes paths off it), and the check view's rows do the same. `rules` (added
+2026-09-10) turns a rule `off` (its violations dropped and counted with the
+ignored) or down to `warn` (reported with a warning severity, `[warning]`
+in the CLI and a badge in the GUI, never counted toward exit 1); `dolly
+rules naming=warn hooks=off` writes it, `on` clears a setting, and with no
+argument the verb prints the settings. Every edit goes through one engine
+function, `editMarker`, which replaces the list or the rules whole and
+validates the result the way a read is; the daemon carries it as `POST
+/api/marker`, and the check view shows the marker under its toolbar
+(2026-09-11): the ignored paths, each with a remove action, and the ten
+rules as three-state rows, the check run again after every change. `dolly check --json` prints the
 report in the daemon's wire shape, one line per report under `--watch`,
 for CI and editors.
 

@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
-import { api, type CheckReport, type CheckViolation, watchChecks } from "../api";
+import {
+  api,
+  type CheckReport,
+  type CheckViolation,
+  type Marker,
+  RULE_IDS,
+  type RuleSetting,
+  watchChecks,
+} from "../api";
 import Message from "../components/Message.vue";
 import ProjectFields from "../components/ProjectFields.vue";
 import { toast } from "../lib/toasts";
@@ -13,7 +21,14 @@ const busy = ref(false);
 const watching = ref(false);
 /** `dolly check --conventions`: the model reads the prose too, with AI on. */
 const conventions = ref(false);
+/** The project's `.dolly`, shown once a check has run on a directory that carries one. */
+const marker = ref<Marker | null>(null);
+const LEVELS = ["on", "warn", "off"] as const;
 let dispose: (() => void) | null = null;
+
+async function loadMarker(): Promise<void> {
+  marker.value = await api.marker(dir.value).catch(() => null);
+}
 
 async function run(fix: boolean): Promise<void> {
   if (!dir.value) {
@@ -28,6 +43,7 @@ async function run(fix: boolean): Promise<void> {
       fix,
       ...(conventions.value ? { conventions: true } : {}),
     });
+    await loadMarker();
     if (fix) {
       const n = report.value.fixed.length;
       toast(n > 0 ? "success" : "error", n > 0 ? `Fixed ${n} issue${n === 1 ? "" : "s"}.` : "Nothing was fixable.");
@@ -74,6 +90,45 @@ async function ignore(path: string): Promise<void> {
     toast("error", cause instanceof Error ? cause.message : String(cause));
   }
 }
+
+/** `dolly ignore --remove` from the panel's chip: the path leaves the list, and the check runs again. */
+async function stopIgnoring(path: string): Promise<void> {
+  if (!marker.value) return;
+  await edit({ ignore: marker.value.ignore.filter((entry) => entry !== path) }, `No longer ignoring ${path}.`);
+}
+
+function levelOf(rule: (typeof RULE_IDS)[number]): (typeof LEVELS)[number] {
+  return marker.value?.rules[rule] ?? "on";
+}
+
+/** `dolly rules` from the panel's segments: on clears the setting, warn and off write it. */
+async function setRule(rule: (typeof RULE_IDS)[number], level: (typeof LEVELS)[number]): Promise<void> {
+  if (!marker.value || levelOf(rule) === level) return;
+  const rules = { ...marker.value.rules };
+  if (level === "on") delete rules[rule];
+  else rules[rule] = level as RuleSetting;
+  await edit({ rules }, `Rule ${rule} is ${level}.`);
+}
+
+/** One write for every panel change (`POST /api/marker`), then the check again so the report agrees with the marker. */
+async function edit(change: { ignore?: string[]; rules?: Marker["rules"] }, said: string): Promise<void> {
+  try {
+    marker.value = await api.editMarker(dir.value, change);
+    toast("success", said);
+    await run(false);
+  } catch (cause) {
+    toast("error", cause instanceof Error ? cause.message : String(cause));
+  }
+}
+
+/** The panel's head: where the pattern lives, and how much the marker sets aside. */
+const markerSummary = computed(() => {
+  if (!marker.value) return "";
+  const source = marker.value.source ? `, source ${marker.value.source}` : "";
+  const down = Object.keys(marker.value.rules).length;
+  const ignored = marker.value.ignore.length;
+  return `pattern ${marker.value.pattern}${source}; ${ignored} ignored path${ignored === 1 ? "" : "s"}, ${down} rule${down === 1 ? "" : "s"} turned down`;
+});
 
 const fixableCount = computed(() => report.value?.violations.filter((v) => v.fixable).length ?? 0);
 const warningCount = computed(
@@ -152,6 +207,52 @@ onBeforeUnmount(() => dispose?.());
     </form>
 
     <p v-if="error" class="error">{{ error }}</p>
+
+    <!-- The marker as the project's own word: what the row actions and dolly ignore and dolly rules write. -->
+    <div v-if="marker" class="panel marker">
+      <div class="panel-head">
+        <h3>.dolly</h3>
+        <span class="count">{{ markerSummary }}</span>
+      </div>
+      <table class="kv">
+        <tbody>
+          <tr>
+            <td class="k">ignored paths</td>
+            <td>
+              <ul v-if="marker.ignore.length" class="chips removable">
+                <li v-for="path in marker.ignore" :key="path">
+                  <span class="mono">{{ path }}</span>
+                  <button type="button" :disabled="busy || watching" :title="`Stop ignoring ${path}`" @click="stopIgnoring(path)">×</button>
+                </li>
+              </ul>
+              <span v-else class="muted">none; a row's ignore action adds one</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="k">rules</td>
+            <td>
+              <div class="rules">
+                <div v-for="rule in RULE_IDS" :key="rule" class="rule">
+                  <span class="mono">{{ rule }}</span>
+                  <div class="segmented">
+                    <button
+                      v-for="level in LEVELS"
+                      :key="level"
+                      type="button"
+                      :class="{ on: levelOf(rule) === level }"
+                      :disabled="busy || watching"
+                      @click="setRule(rule, level)"
+                    >
+                      {{ level }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <template v-if="report">
       <div class="stats five">
@@ -272,3 +373,56 @@ onBeforeUnmount(() => dispose?.());
     </div>
   </section>
 </template>
+
+<style scoped>
+.marker {
+  margin-bottom: 14px;
+}
+
+.chips.removable li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 3px;
+}
+
+.chips.removable button {
+  height: 18px;
+  padding: 0 5px;
+  border: none;
+  background: transparent;
+  color: var(--grey);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.chips.removable button:hover:not(:disabled) {
+  color: var(--charcoal);
+  background: var(--hover);
+}
+
+.rules {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.rule .segmented {
+  padding: 2px;
+  gap: 1px;
+}
+
+.rule .segmented button {
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11.5px;
+}
+</style>

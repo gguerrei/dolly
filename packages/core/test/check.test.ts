@@ -7,6 +7,7 @@ import { checkProject } from "../src/check/check";
 import { exportBundle } from "../src/export/bundle";
 import { extractPattern, saveExtractedPattern } from "../src/extract/extract";
 import {
+  editMarker,
   ignorePaths,
   linkProject,
   type PatternRef,
@@ -716,7 +717,7 @@ describe("checkProject", () => {
     }
   });
 
-  test("ignorePaths appends once each and refuses a path outside the project", async () => {
+  test("ignorePaths appends once each, removes on request, and refuses a path outside the project", async () => {
     const project = await repo({ ".dolly": "pattern: strict\nignore:\n  - legacy/\n" });
     const marker = await ignorePaths(project, ["legacy/", "shell/*.fish"]);
     expect(marker.ignore).toEqual(["legacy/", "shell/*.fish"]);
@@ -725,6 +726,33 @@ describe("checkProject", () => {
     );
     await expect(ignorePaths(project, ["../out"])).rejects.toThrow("not a relative path");
     await expect(ignorePaths(await repo({}), ["x"])).rejects.toThrow("No .dolly marker");
+    expect(
+      (await ignorePaths(project, ["legacy/", "never-there"], { remove: true })).ignore,
+    ).toEqual(["shell/*.fish"]);
+  });
+
+  test("editMarker replaces the ignore list or the rules whole, validated like a read", async () => {
+    const project = await repo({
+      ".dolly": "pattern: strict\nsource: dolly\nignore:\n  - legacy/\n",
+    });
+    const edited = await editMarker(project, { rules: { naming: "warn", hooks: "off" } });
+    expect(edited).toEqual({
+      pattern: "strict",
+      source: "dolly",
+      ignore: ["legacy/"],
+      rules: { naming: "warn", hooks: "off" },
+    });
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe(
+      "pattern: strict\nsource: dolly\nignore:\n  - legacy/\nrules:\n  naming: warn\n  hooks: off\n",
+    );
+    expect((await editMarker(project, { ignore: [], rules: {} })).rules).toEqual({});
+    expect(await readFile(join(project, ".dolly"), "utf8")).toBe(
+      "pattern: strict\nsource: dolly\n",
+    );
+    await expect(
+      editMarker(project, { rules: { naming: "loud" } as unknown as { naming: "warn" } }),
+    ).rejects.toThrow("Not a valid marker edit");
+    await expect(editMarker(await repo({}), { ignore: [] })).rejects.toThrow("No .dolly marker");
   });
 
   test("the marker's ignore list sets violations aside: counted, never reported, never fixed", async () => {

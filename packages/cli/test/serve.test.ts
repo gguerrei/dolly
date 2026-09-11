@@ -486,6 +486,35 @@ describe("dolly serve", () => {
     expect(await check.json()).toMatchObject({ pattern: "tidy", violations: [] });
   });
 
+  test("the marker is read and edited over the wire", async () => {
+    await seedPattern("tidy", DOCS_REQUIRED);
+    const dir = await markedProject("tidy");
+    const read = await api(`/api/marker?dir=${encodeURIComponent(dir)}`);
+    expect(read.status).toBe(200);
+    expect(await read.json()).toEqual({ pattern: "tidy", ignore: [], rules: {} });
+    const edited = await api("/api/marker", {
+      method: "POST",
+      body: JSON.stringify({ dir, ignore: ["legacy/"], rules: { naming: "warn" } }),
+    });
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toEqual({
+      pattern: "tidy",
+      ignore: ["legacy/"],
+      rules: { naming: "warn" },
+    });
+    expect(await readFile(join(dir, ".dolly"), "utf8")).toBe(
+      "pattern: tidy\nignore:\n  - legacy/\nrules:\n  naming: warn\n",
+    );
+    const loud = await api("/api/marker", {
+      method: "POST",
+      body: JSON.stringify({ dir, rules: { naming: "loud" } }),
+    });
+    expect(loud.status).toBe(400);
+    const unmarked = join(home, "unmarked");
+    await mkdir(unmarked, { recursive: true });
+    expect((await api(`/api/marker?dir=${encodeURIComponent(unmarked)}`)).status).toBe(404);
+  });
+
   test("link writes the marker over the wire, and an unknown pattern is a 404", async () => {
     await seedPattern("tidy", DOCS_REQUIRED);
     const dir = join(home, "to-link");

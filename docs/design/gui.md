@@ -73,6 +73,8 @@ that does not validate).
 | `POST /api/import` | `importBundle` | `{ file, force? }`: the pattern the bundle held, from a path or an https URL; an existing name is 409 until `force`, a file that is not a bundle 400 |
 | `POST /api/link` | `linkProject` | `{ dir, pattern, vendor? }`: `dolly link` over the wire; the marker written, an ignore list and rule settings already there kept, `replaced` naming the pattern the project was linked to before, and with `vendor` the pattern copied into the project (`vendored` names the directory) |
 | `POST /api/ignore` | `ignorePaths` | `{ dir, paths }`: `dolly ignore` over the wire; the paths appended to the marker's ignore list, the marker returned whole |
+| `GET /api/marker?dir` | `readMarker` | the project's marker as data, for the check view's panel; a directory without one is a 404 |
+| `POST /api/marker` | `editMarker` | `{ dir, ignore?, rules? }`: `dolly ignore --remove` and `dolly rules` over the wire; the ignore list or the rule settings replaced whole, validated like a read, the marker returned as written |
 | `GET /api/watch?dir&pattern` | `watchProject` | a held-open response streaming one JSON report per line (NDJSON, not SSE: `EventSource` cannot send the auth header, `fetch` can); closing the request disposes the watcher |
 
 The check view strips each violation to
@@ -133,7 +135,13 @@ view and every saved pattern) over the content. Seven views behind a hash
   wearing a warning badge when the marker turned its rule down and an
   ignore action that adds the path to the marker's list (`dolly ignore`),
   the model's findings in their own panel labeled with the model, and
-  diagnostics kept visually apart as the pattern author's problem.
+  diagnostics kept visually apart as the pattern author's problem. Under
+  the toolbar, once a check has run on a directory with a marker, the
+  `.dolly` panel (board `CheckMarker`, 2026-09-11) shows the marker as the
+  project's own word: the pattern and its source, the ignored paths as
+  chips each with a remove action, and the ten rules as on, warn, off
+  segments (`dolly ignore --remove`, `dolly rules`); every change writes
+  the marker and runs the check again.
 - **Fit**: the same directory (shared with Check via `localStorage`),
   then Plan: moves with their import rewrites as subordinate lines, fixes
   with their plan kind and, since 2026-09-01, the patch each would make as

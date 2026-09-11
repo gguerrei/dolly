@@ -234,16 +234,49 @@ export async function linkProject(
   };
 }
 
-/** `dolly ignore`: adds paths to the marker's ignore list, once each; the marker must exist. */
-export async function ignorePaths(projectDir: string, paths: string[]): Promise<Marker> {
+/** The marker's own word, as `dolly ignore`, `dolly rules` and the check view's panel replace it. */
+export interface MarkerEdit {
+  ignore?: string[];
+  rules?: Partial<Record<RuleId, RuleSetting>>;
+}
+
+/**
+ * The marker with its ignore list or its rule settings replaced whole,
+ * validated the way a read is and written; the pattern and its source
+ * stay as they were. The marker must exist.
+ */
+export async function editMarker(projectDir: string, edit: MarkerEdit): Promise<Marker> {
+  const marker = await existingMarker(projectDir);
+  const unsafe = edit.ignore?.find((path) => !isSafePatternPath(path));
+  if (unsafe) throw new MarkerError(`"${unsafe}" is not a relative path inside the project.`);
+  const parsed = markerSchema.safeParse({
+    ...marker,
+    ...(edit.ignore ? { ignore: [...new Set(edit.ignore)] } : {}),
+    ...(edit.rules ? { rules: edit.rules } : {}),
+  });
+  if (!parsed.success) {
+    throw new MarkerError(`Not a valid marker edit:\n${z.prettifyError(parsed.error)}`);
+  }
+  await Bun.write(join(resolve(projectDir), MARKER_FILE), markerContents(parsed.data));
+  return parsed.data;
+}
+
+/** `dolly ignore`: paths added to the marker's ignore list, once each, or taken off it with `remove`. */
+export async function ignorePaths(
+  projectDir: string,
+  paths: string[],
+  options: { remove?: boolean } = {},
+): Promise<Marker> {
+  const { ignore } = await existingMarker(projectDir);
+  return editMarker(projectDir, {
+    ignore: options.remove ? ignore.filter((path) => !paths.includes(path)) : [...ignore, ...paths],
+  });
+}
+
+async function existingMarker(projectDir: string): Promise<Marker> {
   const marker = await readMarker(projectDir);
   if (!marker) {
     throw new MarkerError(`No ${MARKER_FILE} marker here; run \`dolly link <pattern>\` first.`);
   }
-  const unsafe = paths.find((path) => !isSafePatternPath(path));
-  if (unsafe) throw new MarkerError(`"${unsafe}" is not a relative path inside the project.`);
-  const ignore = [...marker.ignore, ...paths.filter((path) => !marker.ignore.includes(path))];
-  const updated = { ...marker, ignore };
-  await Bun.write(join(resolve(projectDir), MARKER_FILE), markerContents(updated));
-  return updated;
+  return marker;
 }

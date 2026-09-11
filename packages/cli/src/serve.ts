@@ -17,6 +17,7 @@ import {
   draftConventions,
   EXPORT_TARGETS,
   ExportExistsError,
+  editMarker,
   exportPattern,
   extractFromRepos,
   extractPattern,
@@ -29,6 +30,7 @@ import {
   ignorePaths,
   importBundle,
   linkProject,
+  type MarkerEdit,
   MarkerError,
   PatternExistsError,
   PatternNotFoundError,
@@ -37,6 +39,7 @@ import {
   PatternStore,
   type Proposal,
   parsePatternDocument,
+  readMarker,
   renderExport,
   renderProposal,
   resolvePattern,
@@ -434,6 +437,27 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
       ...(body.vendor ? { vendorFrom: store } : {}),
     });
     return json({ pattern: body.pattern, ...linked });
+  }
+
+  if (path === "/api/marker" && request.method === "GET") {
+    // The check view's marker panel: the marker as data, a 404 without one.
+    const dir = url.searchParams.get("dir");
+    if (!dir) return json({ error: "`dir` is required: the project directory." }, 400);
+    const marker = await readMarker(dir);
+    return marker ? json(marker) : json({ error: `No .dolly marker in ${dir}.` }, 404);
+  }
+
+  if (path === "/api/marker" && request.method === "POST") {
+    // `dolly ignore` and `dolly rules` over the wire: the ignore list or the
+    // rule settings replaced whole, the marker returned as written.
+    const body = (await request.json()) as { dir?: string } & MarkerEdit;
+    if (!body.dir) return json({ error: "`dir` is required: the project directory." }, 400);
+    return json(
+      await editMarker(body.dir, {
+        ...(body.ignore ? { ignore: body.ignore } : {}),
+        ...(body.rules ? { rules: body.rules } : {}),
+      }),
+    );
   }
 
   if (path === "/api/ignore" && request.method === "POST") {
