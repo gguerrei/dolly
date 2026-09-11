@@ -38,8 +38,8 @@ button beside every path field (`src/lib/native.ts`); in a plain browser
 the button is absent and paths are typed.
 
 ```sh
-bun run tauri dev     # builds the webview, compiles the shell, opens the window
-bun run tauri build   # produces installable bundles (.app and .dmg on macOS, deb/rpm/AppImage on Linux)
+bun run tauri dev     # builds the webview, compiles the shell, opens the window (the daemon runs from the checkout)
+bun run tauri build   # builds the webview, compiles dolly as the sidecar, and produces the bundles (.app and .dmg on macOS, deb/rpm/AppImage on Linux, .msi on Windows)
 ```
 
 It needs the Rust toolchain and the platform's webview libraries. On macOS
@@ -63,6 +63,9 @@ The icon set under `src-tauri/icons` is generated, not drawn: after a change
 to `assets/app-icon.svg`, run `bun run tauri icon ../../assets/app-icon.svg`
 from this directory (the npm CLI does it without Rust).
 
-The shell spawns the daemon as `bun dolly serve` from the workspace root,
-so it currently presumes a checkout with `bun` on the PATH; bundling a
-compiled `dolly` binary as a real sidecar is release work, not M5's.
+A built app carries the compiled daemon beside its own executable (Tauri's
+sidecar: `bun run sidecar` compiles it to `src-tauri/binaries/dolly-<host
+triple>` with the GUI embedded, and `externalBin` in `tauri.conf.json`
+bundles it), and the shell spawns that binary. Under `tauri dev` there is no
+sidecar, so the shell spawns `bun dolly serve` from the workspace root and
+presumes `bun` on the PATH.

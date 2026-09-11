@@ -5,6 +5,9 @@
  * places and nowhere else, never in files dolly writes.
  */
 
+import { mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { dollyHome } from "../store";
 import { PROVIDERS, type ProviderId } from "./providers";
 
 export type KeySource = "environment" | "keychain";
@@ -70,14 +73,57 @@ export async function storeKey(provider: ProviderId, key: string): Promise<void>
       }
       return;
     }
+    case "win32": {
+      // DPAPI through PowerShell: the key rides stdin and lands sealed for
+      // this Windows user alone, in dolly's own home. Never plaintext.
+      await mkdir(dirname(dpapiFile(provider)), { recursive: true });
+      const result = await runTool(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", dpapiSeal(dpapiFile(provider))],
+        key,
+      );
+      if (!result) {
+        throw new KeychainUnavailableError(provider, "PowerShell was not found on this machine.");
+      }
+      if (!result.ok) {
+        throw new KeychainUnavailableError(
+          provider,
+          `DPAPI refused the write: ${result.stderr.trim() || "unknown error"}.`,
+        );
+      }
+      return;
+    }
     default:
-      // Windows waits on a machine that can verify a DPAPI route (M9, with
-      // the CI matrix). Refusal beats a plaintext fallback.
       throw new KeychainUnavailableError(
         provider,
-        `dolly has no keychain support on ${process.platform} yet.`,
+        `dolly has no keychain support on ${process.platform}.`,
       );
   }
+}
+
+/** Where a sealed key lives on Windows: beside the pattern store, one file per provider. */
+function dpapiFile(provider: ProviderId): string {
+  return join(dollyHome(), "keys", `${provider}.dpapi`);
+}
+
+/** PowerShell that seals stdin for the current user into the file; a quote in the path is doubled. */
+function dpapiSeal(file: string): string {
+  return [
+    "Add-Type -AssemblyName System.Security",
+    "$key = [Console]::In.ReadToEnd().Trim()",
+    "$bytes = [Text.Encoding]::UTF8.GetBytes($key)",
+    "$sealed = [Security.Cryptography.ProtectedData]::Protect($bytes, $null, 'CurrentUser')",
+    `[IO.File]::WriteAllBytes('${file.replaceAll("'", "''")}', $sealed)`,
+  ].join("; ");
+}
+
+/** PowerShell that unseals the file for the current user and prints the key. */
+function dpapiOpen(file: string): string {
+  return [
+    "Add-Type -AssemblyName System.Security",
+    `$sealed = [IO.File]::ReadAllBytes('${file.replaceAll("'", "''")}')`,
+    "$bytes = [Security.Cryptography.ProtectedData]::Unprotect($sealed, $null, 'CurrentUser')",
+    "[Console]::Out.Write([Text.Encoding]::UTF8.GetString($bytes))",
+  ].join("; ");
 }
 
 async function keychainRead(provider: ProviderId): Promise<string | null> {
@@ -96,6 +142,17 @@ async function keychainRead(provider: ProviderId): Promise<string | null> {
     }
     case "linux": {
       const result = await runTool(["secret-tool", "lookup", ...attrs(provider)]);
+      return result?.ok ? result.stdout.trim() || null : null;
+    }
+    case "win32": {
+      if (!(await Bun.file(dpapiFile(provider)).exists())) return null;
+      const result = await runTool([
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        dpapiOpen(dpapiFile(provider)),
+      ]);
       return result?.ok ? result.stdout.trim() || null : null;
     }
     default:

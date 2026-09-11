@@ -1,14 +1,38 @@
 {
   "name": "dollysheep",
   "version": "0.1.0-dev",
-  "private": true,
   "type": "module",
-  "description": "dolly on the command line.",
+  "description": "dolly: save the way you build software as a pattern, then apply it anywhere. The command line, the local daemon, and the GUI it serves.",
   "license": "MIT",
-  "bin": {
-    "dolly": "./src/main.ts"
+  "homepage": "https://github.com/gguerrei/dolly#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gguerrei/dolly.git",
+    "directory": "packages/cli"
   },
-  "dependencies": {
+  "bugs": "https://github.com/gguerrei/dolly/issues",
+  "keywords": [
+    "scaffold",
+    "lint",
+    "project-structure",
+    "conventions",
+    "patterns",
+    "cli",
+    "bun"
+  ],
+  "bin": {
+    "dolly": "./dist/main.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "bun": ">=1.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
     "@dollysheep/core": "workspace:*",
     "commander": "^14.0.0"
   }

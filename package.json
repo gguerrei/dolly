@@ -12,7 +12,10 @@
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "build:ui": "bun run --cwd apps/desktop build && bun packages/cli/scripts/embed-ui.ts",
+    "build:binary": "bun run build:ui && bun build --compile packages/cli/src/main.ts --outfile dist/dolly",
+    "build:npm": "bun run build:ui && bun build --target=bun packages/cli/src/main.ts --outdir packages/cli/dist"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.1.0",

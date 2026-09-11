@@ -77,3 +77,11 @@ describe("pattern documents", () => {
     );
   });
 });
+
+test("a format this dolly does not read is said outright, newer or older", () => {
+  expect(() => parsePatternDocument("---\nformat: 2\nname: future\n---\n")).toThrow(
+    "written by a newer dolly",
+  );
+  expect(() => parsePatternDocument("---\nformat: 0\nname: past\n---\n")).toThrow("re-extract it");
+  expect(parsePatternDocument("---\nformat: 1\nname: now\n---\n").pattern.format).toBe(1);
+});
