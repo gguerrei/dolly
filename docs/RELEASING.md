@@ -44,7 +44,13 @@ the maintainer's hands.
    binaries and the installers, opens a **draft** release carrying them, and
    publishes `@dollysheep/core` and then `dollysheep` to npm when the
    repository has an `NPM_TOKEN` secret (it says so and skips when it does
-   not).
+   not). The token must be one npm lets publish without a one-time code: a
+   granular access token with "bypass two-factor authentication" enabled,
+   scoped to the two packages; a token without it is refused with a 403.
+   Set it from a terminal, never through a chat: `gh secret set NPM_TOKEN`
+   prompts for it. A fix to the workflow after a tag means moving the tag:
+   delete the draft release, `git tag -f v0.1.0 && git push -f origin
+   v0.1.0`, and the run starts over.
 4. Read the draft, then publish it.
 5. Homebrew: copy `packaging/homebrew/dolly.rb` into the tap
    (`gguerrei/homebrew-dolly`, `Formula/dolly.rb`), set `version` and the two
