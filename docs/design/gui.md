@@ -189,6 +189,15 @@ view and every saved pattern) over the content. Seven views behind a hash
 Feedback is never silent: saves, deletes, and fixes toast; loads show
 skeletons; empty states show the mark and the next command to run.
 
+The views are walked by tests since 2026-09-11 (`apps/desktop/e2e`,
+Playwright, Chromium only): the global setup extracts a small fixture into a
+temporary store, copies it twice with the README removed, one copy for
+check and one for fit, and starts `dolly serve` over that home; one spec
+per view (`<view>.e2e.ts`, a suffix `bun test` leaves alone) then opens the tokened URL the way the printed one is opened and
+walks the view, asserting its text and that the page logged no error. CI
+runs them after the webview build; `bun run e2e` in `apps/desktop` runs
+them here.
+
 Theme: the sheep palette (white, black, and greys only), both modes via
 `prefers-color-scheme`, with Inter self-hosted so typography does not
 depend on the host OS (everything ships in the bundle; the daemon's CSP

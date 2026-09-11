@@ -302,6 +302,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The engine publishes as `@dollysheep/core`, a library build with
   declarations that `bun run build:core` puts under `packages/core/dist`;
   the release workflow publishes it before the CLI.
+- The GUI has tests: Playwright walks every view in Chromium against a
+  daemon over a seeded store (`apps/desktop/e2e`), and CI runs them after
+  the webview build.
 
 ### Changed
 
