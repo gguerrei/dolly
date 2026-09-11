@@ -225,6 +225,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notes behind Show all; the fit view shows each fix's patch as a diff
   under its row, a dozen lines and then Show all. Both boards were
   approved on the canvas first.
+- A checkout carries its pattern: `dolly link <pattern> --vendor` copies the
+  pattern directory into the project under `dolly/` and the marker's new
+  `source:` points there, so CI and a teammate's clone check without an
+  import; `source:` also takes an https URL to a bundle, fetched per run
+  under import's caps. Every verb that takes a project resolves through one
+  function, and the daemon's link route takes `vendor`.
+- The marker's `rules:` turns a rule `off` (its violations dropped and
+  counted with the ignored) or down to `warn` (reported with a warning
+  severity that never trips the exit code), and `dolly ignore <paths...>`
+  appends to the ignore list from the terminal, as `POST /api/ignore` does
+  for the GUI.
+- `dolly check --conventions`: with AI on, one model call reads the prose
+  conventions against the code files changed since HEAD (at most 25 files,
+  64 KiB each, 200 KiB in all, the rest named as skipped) and reports what it
+  sees in its own section, labeled with the model and never counted; the
+  daemon takes `conventions` on its check route.
+- Five more export frames, each the same brief: `claude-md` (CLAUDE.md),
+  `copilot` (.github/copilot-instructions.md), `gemini` (GEMINI.md),
+  `windsurf` (.windsurf/rules/<name>.md) and `cline` (.clinerules/<name>.md),
+  in the CLI, the daemon, and the export view.
+- `dolly ai --verify` makes one live call and reports the provider's verdict
+  on the active key.
 
 ### Changed
 
