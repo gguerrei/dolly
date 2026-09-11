@@ -25,6 +25,11 @@ jobs:
       - run: bun run version:check
       - run: bun run typecheck
       - run: bun run --cwd apps/desktop build
+      # The GUI walked in Chromium against a daemon over a seeded store (apps/desktop/e2e).
+      - run: bunx playwright install --with-deps chromium
+        working-directory: apps/desktop
+      - run: bun run e2e
+        working-directory: apps/desktop
 
   test:
     strategy:

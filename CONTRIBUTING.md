@@ -23,6 +23,7 @@ bun test
 | `bun run typecheck` | Type-check (tsc, strict) |
 | `bun run --cwd apps/desktop build` | Type-check the GUI (vue-tsc) and build the webview |
 | `bun test` | Run the test suite |
+| `bun run --cwd apps/desktop e2e` | Walk every GUI view in Chromium against a daemon over a seeded store (`apps/desktop/e2e`); needs the webview built and, once, `bunx playwright install chromium` from `apps/desktop` |
 | `bun run dolly <args>` | Run the CLI from source |
 
 > Tip: set `DOLLY_HOME=/tmp/dolly-dev` (or any scratch directory) while developing so CLI experiments never touch your real pattern store. When a CLI command takes flags, separate them from `bun run` with `--`, e.g. `bun run dolly -- export my-pattern --out shared.dolly`.
@@ -58,7 +59,7 @@ docs: clarify pattern store location in README
 ## Pull requests
 
 - Keep PRs small and focused: one change per PR.
-- All checks must pass: `bun run check`, `bun run typecheck`, `bun run --cwd apps/desktop build`, `bun test`.
+- All checks must pass: `bun run check`, `bun run typecheck`, `bun run --cwd apps/desktop build`, `bun test`, and `bun run --cwd apps/desktop e2e` when the GUI changed.
 - Update docs when behavior changes.
 
 ## Roadmap
