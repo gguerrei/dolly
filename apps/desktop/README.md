@@ -1,8 +1,11 @@
 # @dollysheep/desktop
 
-dolly's GUI: a Vue 3 webview served by the local daemon. The design (the
-daemon protocol, the views, and why this app never links the engine
-directly) is described in the daemon's source, `packages/cli/src/serve.ts`.
+dolly's GUI: a Vue 3 webview served by the local daemon, and the Tauri shell
+that wraps it as the desktop app on the release page (`.dmg`, `.deb`, `.rpm`,
+`.msi`). The daemon protocol, the views, and why this app never links the
+engine directly are described in the daemon's source,
+`packages/cli/src/serve.ts`. The daemon serves the page with a content
+security policy, never framed, and every `/api` call carries the run's token.
 
 ## Use it
 
@@ -19,6 +22,7 @@ the page reads it from the fragment, so open the URL exactly as printed.
 ```sh
 bun dolly serve                    # terminal 1: the engine's door
 bun run --cwd apps/desktop dev     # terminal 2: Vite, proxying /api
+bun run --cwd apps/desktop e2e     # the views walked in Chromium, after a build (Chromium once: bunx playwright install chromium)
 ```
 
 Then open Vite's URL with the daemon's token appended, e.g.

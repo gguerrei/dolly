@@ -1,7 +1,7 @@
 # Runs `dolly check` before every commit. In a project's .pre-commit-config.yaml:
 #
 #   - repo: https://github.com/gguerrei/dolly
-#     rev: v0.1.0
+#     rev: v0.1.1
 #     hooks:
 #       - id: dolly-check
 #

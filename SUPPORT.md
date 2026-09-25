@@ -10,6 +10,7 @@
   form.
 - **A vulnerability**: not an issue; see [SECURITY.md](SECURITY.md).
 
-Before asking, `dolly --help` lists every verb, `dolly show <pattern>` prints
-a pattern with its extraction notes, and the README's roadmap says
-what exists and what is still ahead.
+Before asking, `dolly --help` lists every verb, `dolly --version` says which
+release you have, `dolly show <pattern>` prints a pattern with its
+extraction notes, and the README says what dolly does and what is still
+ahead.

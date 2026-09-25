@@ -22,7 +22,10 @@ console.log(report.violations.length === 0 ? "clean" : report.violations);
 Everything exported from the package's entry point is the public API, one
 function per verb, typed and documented at the declaration. What is not
 exported is internal and free to move; the `dolly` command's own help
-says what each verb does.
+says what each verb does. The library holds the same lines the command
+does: it never follows a symlink, a pattern from elsewhere can make it run
+only the commands a plan shows first, and keys stay in the keychain or the
+environment. The repository's `SECURITY.md` has the list.
 
 MIT licensed; the notices for what the package bundles are in
 `THIRD_PARTY_LICENSES.md` beside this file.
