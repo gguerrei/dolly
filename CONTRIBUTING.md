@@ -1,6 +1,6 @@
 # Contributing to dolly
 
-Thanks for your interest in dolly! The project is pre-0.1 and under heavy development, so expect churn, and expect your feedback and patches to have real impact.
+Thanks for your interest in dolly! The project is at its first release, so expect it to move quickly, and expect your feedback to shape it.
 
 ## Prerequisites
 
