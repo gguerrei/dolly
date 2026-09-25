@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Nothing yet.
 
+## [0.1.1] (2026-09-25)
+
+### Changed
+
+- The working documents (the plan, the log, the design notes, the decision
+  records and the canvas boards) moved to a private repository. The READMEs,
+  the contributing guide and the source comments now say what they need
+  without pointing at them, and `@dollysheep/core`'s README on npm no longer
+  carries links that went nowhere.
+
 ## [0.1.0] (2026-09-25)
 
 The first release: everything below landed between the bootstrap and today.
