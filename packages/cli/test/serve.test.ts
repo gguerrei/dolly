@@ -741,3 +741,30 @@ describe("dolly serve", () => {
     expect(await page.text()).toContain("API only");
   });
 });
+
+describe("the webview's edges", () => {
+  test("a malformed path is a 404, never bun's error page, and the page carries its headers", async () => {
+    const ui = join(home, "dist");
+    await mkdir(ui, { recursive: true });
+    await writeFile(join(ui, "index.html"), "<!doctype html><title>dolly</title>");
+    const withUi = await serveDolly({
+      port: 0,
+      store: new PatternStore(join(home, "patterns")),
+      uiDir: ui,
+    });
+    try {
+      const base = `http://127.0.0.1:${withUi.port}`;
+      for (const path of ["/%zz", "/%", "/constructor", "/__proto__", "/toString"]) {
+        const response = await fetch(`${base}${path}`);
+        expect(response.status).toBe(404);
+        expect(await response.text()).not.toContain("serve.ts");
+      }
+      const page = await fetch(`${base}/`);
+      expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+      expect(page.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(page.headers.get("referrer-policy")).toBe("no-referrer");
+    } finally {
+      withUi.stop();
+    }
+  });
+});

@@ -706,3 +706,27 @@ async function noKeychainPath(): Promise<string> {
   await chmod(join(dir, "secret-tool"), 0o755);
   return `${dir}:${process.env.PATH ?? ""}`;
 }
+
+describe("what an imported pattern can run", () => {
+  test("import names the commands a pattern carries, since fit --apply and new act on them", async () => {
+    await seedPattern(
+      "runs",
+      [
+        "---",
+        "name: runs",
+        "commands:",
+        "  test: bun test",
+        "  typecheck: tsc --noEmit",
+        "---",
+      ].join("\n"),
+    );
+    const out = join(home, "runs.dolly");
+    expect((await dolly("export", "runs", "--out", out)).exitCode).toBe(0);
+    const elsewhere = { DOLLY_HOME: join(home, "elsewhere") };
+    const imported = await dollyWithEnv(elsewhere, "import", out);
+    expect(imported.exitCode).toBe(0);
+    expect(imported.stdout).toContain("Its commands, which `dolly fit --apply` runs");
+    expect(imported.stdout).toContain("typecheck: tsc --noEmit");
+    expect(imported.stdout).toContain("test: bun test");
+  });
+});

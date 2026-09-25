@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { draftConventions } from "../src/ai/conventions";
@@ -235,6 +235,26 @@ describe("conventions", () => {
     expect(sent).toContain("commands.lint: a new verb");
   });
 
+  test("only code files the inventory can see reach the model: never a .env, never a path outside", async () => {
+    const { store, root } = await extracted();
+    await turnOn();
+    await writeFile(join(root, ".env"), "API_KEY=secret-value\n");
+    stubModel("- nothing new");
+    await draftConventions(
+      await store.load("widget"),
+      root,
+      [".env", "src/Widget.ts", "../outside.txt"],
+      [],
+    );
+    const sent = requests[0]?.body.messages?.[0]?.content ?? "";
+    expect(sent).toContain("--- src/Widget.ts");
+    expect(sent).not.toContain("secret-value");
+    expect(sent).not.toContain("outside.txt");
+    requests.length = 0;
+    expect(await draftConventions(await store.load("widget"), root, [".env"], [])).toEqual([]);
+    expect(requests.length).toBe(0);
+  });
+
   test("no changed files means no call, and a provider failure surfaces in the provider's words", async () => {
     const { store, root } = await extracted();
     await turnOn();
@@ -249,4 +269,27 @@ describe("conventions", () => {
       draftConventions(await store.load("widget"), root, ["src/Widget.ts"], []),
     ).rejects.toThrow("overloaded");
   });
+});
+
+describe("what learn may write and send", () => {
+  test.skipIf(process.platform === "win32")(
+    "saveLearned refuses a capture behind a symlink, and a proposal through the prototype",
+    async () => {
+      const store = await freshStore();
+      await seed(store, { name: "linked" });
+      const outside = await mkdtemp(join(tmpdir(), "dolly-outside-"));
+      await symlink(outside, join(store.dirOf("linked"), "toolchain"));
+      const capture: Proposal = {
+        path: ["toolchain", "configs", "biome.json"],
+        value: "toolchain/biome.json",
+        reason: "captured",
+        files: { "toolchain/biome.json": "{}\n" },
+      };
+      await expect(saveLearned(store, "linked", [capture])).rejects.toThrow("inside the pattern");
+      expect(await readdir(outside)).toEqual([]);
+      const polluting: Proposal = { path: ["__proto__", "polluted"], value: true, reason: "no" };
+      await expect(saveLearned(store, "linked", [polluting])).rejects.toThrow("__proto__");
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    },
+  );
 });

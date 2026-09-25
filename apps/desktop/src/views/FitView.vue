@@ -253,7 +253,7 @@ const gitLine = computed(() => {
             <h3 class="warm">translations</h3>
             <span class="count">
               {{ translations.length }} file{{ translations.length === 1 ? "" : "s" }}, {{ translationKiB }} KiB to the
-              model under Apply; typecheck and test judge the result before any source is removed
+              model under Apply; the pattern's commands judge the result before any source is removed
             </span>
           </div>
           <table>
@@ -262,6 +262,15 @@ const gitLine = computed(() => {
                 <td class="path">{{ step.from }} → {{ step.to }}</td>
                 <td><Message :text="step.reason" /></td>
                 <td class="actions"><span class="badge">{{ step.language }}</span></td>
+              </tr>
+              <!-- The exact strings Apply runs in the project, so a pattern from elsewhere is read before it is trusted. -->
+              <tr v-for="(command, verb) in report.verification ?? {}" :key="verb" class="sub">
+                <td class="path">{{ verb }}</td>
+                <td colspan="2"><code>{{ command }}</code></td>
+              </tr>
+              <tr v-if="!report.verification || Object.keys(report.verification).length === 0" class="sub">
+                <td class="path"></td>
+                <td colspan="2">the pattern names no typecheck or test command, so the translation is unverified</td>
               </tr>
             </tbody>
           </table>

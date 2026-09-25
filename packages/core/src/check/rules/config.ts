@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { isManifestName } from "../../extract/registry";
 import { isSafePatternPath } from "../../pattern/schema";
 import { getDeep, isSafeDottedPath } from "../../serialize";
+import { pathWithin, readIfExists } from "../../tree/files";
 import type { FixPlan } from "../fix";
 import { invisibleFile, type Rule, type Violation } from "../rule";
 import { canRewrite, isSubsetOf, parseLoose } from "../support";
@@ -22,14 +23,13 @@ export const configRule: Rule = {
         diagnose(`config source "${sourceId}" is not a safe relative path; not checked.`);
         continue;
       }
-      const capturedFile = Bun.file(join(patternDir, patternRel));
-      if (!(await capturedFile.exists())) {
+      const captured = await pathWithin(patternDir, patternRel).then(readIfExists, () => undefined);
+      if (captured === undefined) {
         diagnose(
-          `captured config ${patternRel} is missing from the pattern, so ${sourceId} was not checked.`,
+          `captured config ${patternRel} is missing from the pattern or sits behind a symlink, so ${sourceId} was not checked.`,
         );
         continue;
       }
-      const captured = await capturedFile.text();
       const hash = sourceId.indexOf("#");
       const dotted = hash === -1 ? undefined : sourceId.slice(hash + 1);
       if (dotted !== undefined && !isSafeDottedPath(dotted)) {
@@ -94,7 +94,7 @@ export const configRule: Rule = {
           path: target,
           message:
             mode === "verbatim"
-              ? "differs from the captured config (verbatim binding)"
+              ? "differs from the captured config (verbatim binding); `dolly fit` rewrites it behind a checkpoint"
               : "differs from the captured config (not JSON/TOML, so subset falls back to byte equality); reconcile by hand, or bind it as verbatim or presence in toolchain.binding",
           ...(mode === "verbatim"
             ? { fix: { kind: "write", path: target, contents: captured } satisfies FixPlan }

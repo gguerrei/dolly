@@ -1,5 +1,5 @@
 import type { Dirent } from "node:fs";
-import { lstat, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +9,7 @@ import {
   serializePatternDocument,
 } from "./pattern/document";
 import { isSafePatternPath, patternSchema } from "./pattern/schema";
+import { pathWithin, walkFiles } from "./tree/files";
 
 export const PATTERN_FILE = "pattern.md";
 
@@ -112,7 +113,7 @@ export class PatternStore {
   }
 
   async save(doc: PatternDocument): Promise<void> {
-    const dir = this.dirOf(doc.pattern.name);
+    const dir = await pathWithin(this.root, this.dirOf(doc.pattern.name).slice(this.root.length));
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, PATTERN_FILE), serializePatternDocument(doc));
   }
@@ -123,24 +124,20 @@ export class PatternStore {
     await rm(this.dirOf(name), { recursive: true });
   }
 
-  /** The pattern's captured files (configs and templates), pattern-relative and sorted; pattern.md is not among them. */
+  /** The pattern's captured files (configs and templates), pattern-relative and sorted; pattern.md is not among them, nor anything a symlink leads to. */
   async files(name: string): Promise<string[]> {
     if (!(await this.has(name))) throw new PatternNotFoundError(name);
-    const dir = this.dirOf(name);
-    const files: string[] = [];
-    for (const entry of await readdir(dir, { recursive: true })) {
-      const rel = entry.replaceAll("\\", "/");
-      if (rel !== PATTERN_FILE && (await lstat(join(dir, rel))).isFile()) files.push(rel);
-    }
-    return files.sort();
+    return (await walkFiles(this.dirOf(name))).filter((rel) => rel !== PATTERN_FILE);
   }
 
-  /** Absolute path of a captured file, behind the one gate every pattern path passes. */
-  fileOf(name: string, rel: string): string {
+  /** Absolute path of a captured file, behind the one gate every pattern path passes, symlinks refused. */
+  async fileOf(name: string, rel: string): Promise<string> {
     if (!isSafePatternPath(rel) || !/^(toolchain|templates)\/.+/.test(rel)) {
       throw new InvalidPatternFileError(rel);
     }
-    return join(this.dirOf(name), rel);
+    return pathWithin(this.dirOf(name), rel).catch(() => {
+      throw new InvalidPatternFileError(rel);
+    });
   }
 }
 

@@ -17,6 +17,7 @@ const out = join(cli, "src", "ui.generated.ts");
 const files: string[] = [];
 for (const entry of await readdir(dist, { recursive: true })) {
   const rel = entry.replaceAll("\\", "/");
+  if (rel.split("/").some((segment) => segment.startsWith("."))) continue; // a .DS_Store is not the GUI
   if ((await lstat(join(dist, rel))).isFile()) files.push(rel);
 }
 files.sort();

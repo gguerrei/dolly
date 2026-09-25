@@ -97,7 +97,8 @@ export async function checkProject(
   const fixFailures: string[] = [];
   const skip = losingCreates(first.violations);
   for (const violation of first.violations) {
-    if (!violation.fix || skip.has(violation)) continue;
+    // A whole-file overwrite (the verbatim binding) is fit's to apply, behind its checkpoint.
+    if (!violation.fix || violation.fix.kind === "write" || skip.has(violation)) continue;
     try {
       // A skipped fix (the disk guard held) is not a performed one; the
       // re-run below decides whether its violation still stands.

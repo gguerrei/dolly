@@ -4,9 +4,10 @@ import { join, resolve } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { z } from "zod";
 import { RULE_IDS, type RuleId } from "./check/rule";
-import { importBundle } from "./export/bundle";
+import { importBundle, isBundleUrl } from "./export/bundle";
 import { isSafePatternPath, patternSchema } from "./pattern/schema";
 import { dollyHome, PatternStore } from "./store";
+import { pathWithin, readIfExists } from "./tree/files";
 
 /**
  * The `.dolly` marker: a committed YAML file linking a project to its
@@ -47,15 +48,12 @@ export interface Marker {
   rules: Partial<Record<RuleId, RuleSetting>>;
 }
 
-/** A bundle URL: https anywhere, plain http only on this machine. */
-const BUNDLE_URL = /^(https:\/\/|http:\/\/(127\.0\.0\.1|localhost)(:|\/))/;
-
 const markerSchema = z.strictObject({
   pattern: patternSchema.shape.name,
   source: z
     .string()
     .refine(
-      (s) => BUNDLE_URL.test(s) || isSafePatternPath(s),
+      (s) => isBundleUrl(s) || isSafePatternPath(s),
       "source is a project-relative directory or an https URL to a .dolly bundle",
     )
     .optional(),
@@ -90,13 +88,13 @@ export function markerContents(marker: {
   });
 }
 
-/** The marker as data, undefined without one; a marker that does not parse is an error, never silence. */
+/** The marker as data, undefined without one (a symlinked one counts as none); a marker that does not parse is an error, never silence. */
 export async function readMarker(projectDir: string): Promise<Marker | undefined> {
-  const file = Bun.file(join(resolve(projectDir), MARKER_FILE));
-  if (!(await file.exists())) return undefined;
+  const text = await readIfExists(join(resolve(projectDir), MARKER_FILE));
+  if (text === undefined) return undefined;
   let raw: unknown;
   try {
-    raw = parseYaml(await file.text());
+    raw = parseYaml(text);
   } catch (cause) {
     throw new MarkerError(`${MARKER_FILE} is not valid YAML: ${(cause as Error).message}`);
   }
@@ -137,13 +135,20 @@ export async function resolvePattern(
   const marker = await readMarker(projectDir);
   if (!marker) return undefined;
   if (!marker.source) return { store, name: marker.pattern };
-  if (!BUNDLE_URL.test(marker.source)) {
+  if (!isBundleUrl(marker.source)) {
     return {
-      store: new PatternStore(join(resolve(projectDir), marker.source)),
+      store: new PatternStore(await inside(projectDir, marker.source)),
       name: marker.pattern,
     };
   }
   return { store: await fetchedSource(marker.source, marker), name: marker.pattern };
+}
+
+/** A project path the marker or the vendoring touches, refused when a committed symlink would carry it out of the project. */
+async function inside(projectDir: string, rel: string): Promise<string> {
+  return pathWithin(resolve(projectDir), rel).catch((cause: Error) => {
+    throw new MarkerError(cause.message);
+  });
 }
 
 /**
@@ -216,11 +221,12 @@ export async function linkProject(
   if (options.vendorFrom) {
     await options.vendorFrom.load(pattern); // a vendored copy must be a valid pattern
     vendored = `${VENDOR_DIR}/${pattern}`; // the marker's own separator, whatever the platform's
-    await rm(join(root, vendored), { recursive: true, force: true });
-    await cp(options.vendorFrom.dirOf(pattern), join(root, vendored), { recursive: true });
+    const target = await inside(root, vendored);
+    await rm(target, { recursive: true, force: true });
+    await cp(options.vendorFrom.dirOf(pattern), target, { recursive: true });
   }
   await Bun.write(
-    join(root, MARKER_FILE),
+    await inside(root, MARKER_FILE),
     markerContents({
       pattern,
       ...(vendored ? { source: VENDOR_DIR } : {}),
@@ -257,7 +263,7 @@ export async function editMarker(projectDir: string, edit: MarkerEdit): Promise<
   if (!parsed.success) {
     throw new MarkerError(`Not a valid marker edit:\n${z.prettifyError(parsed.error)}`);
   }
-  await Bun.write(join(resolve(projectDir), MARKER_FILE), markerContents(parsed.data));
+  await Bun.write(await inside(projectDir, MARKER_FILE), markerContents(parsed.data));
   return parsed.data;
 }
 

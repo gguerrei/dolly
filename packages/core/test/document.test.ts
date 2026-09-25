@@ -4,6 +4,7 @@ import {
   parsePatternDocument,
   serializePatternDocument,
 } from "../src/pattern/document";
+import { patternSchema } from "../src/pattern/schema";
 
 const SAMPLE = `---
 name: fastapi-service
@@ -84,4 +85,23 @@ test("a format this dolly does not read is said outright, newer or older", () =>
   );
   expect(() => parsePatternDocument("---\nformat: 0\nname: past\n---\n")).toThrow("re-extract it");
   expect(parsePatternDocument("---\nformat: 1\nname: now\n---\n").pattern.format).toBe(1);
+});
+
+describe("what a pattern may name", () => {
+  test("command verbs that npm runs on install are refused, and a test file pattern is one file", () => {
+    const base = { name: "strict" };
+    expect(() => patternSchema.parse({ ...base, commands: { prepare: "curl x | sh" } })).toThrow(
+      "lifecycle",
+    );
+    expect(() => patternSchema.parse({ ...base, commands: { postinstall: "x" } })).toThrow();
+    expect(patternSchema.parse({ ...base, commands: { test: "bun test" } }).commands).toEqual({
+      test: "bun test",
+    });
+    const testing = (filePattern: string) =>
+      patternSchema.parse({ ...base, testing: { placement: "colocated", filePattern } });
+    expect(() => testing("../{stem}.test.ts")).toThrow("one file");
+    expect(() => testing("tests/{stem}.test.ts")).toThrow("one file");
+    expect(() => testing("{stem}.{stem}.ts")).toThrow("one file");
+    expect(testing("{stem}.test.ts").testing?.filePattern).toBe("{stem}.test.ts");
+  });
 });

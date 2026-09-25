@@ -115,7 +115,9 @@ export async function serveDolly(options: ServeOptions = {}): Promise<DollyServe
     hostname: "127.0.0.1",
     port: options.port ?? DEFAULT_PORT,
     idleTimeout: 0, // a watch stream is idle by design between reports
+    development: false, // never bun's own error page, which prints source and paths
     fetch: (request) => handle(request, { store, token, uiDir, uiAvailable, embedded }),
+    error: () => json({ error: "The daemon could not answer that request." }, 500),
   });
 
   const port = server.port as number; // always set for a TCP listener
@@ -219,7 +221,8 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
         return json({ error: `${request.method} is not supported here.` }, 405);
       return json(await store.files(name));
     }
-    const file = Bun.file(store.fileOf(name, rel)); // InvalidPatternFileError → 400
+    const target = await store.fileOf(name, rel); // InvalidPatternFileError → 400
+    const file = Bun.file(target);
     if (!(await file.exists()))
       return json({ error: `"${name}" has no captured file ${rel}.` }, 404);
     if (request.method === "GET") return json({ name, path: rel, contents: await file.text() });
@@ -231,7 +234,7 @@ async function route(request: Request, ctx: Context, url: URL): Promise<Response
           413,
         );
       }
-      await writeFile(store.fileOf(name, rel), contents);
+      await writeFile(target, contents);
       return json({ name, path: rel });
     }
     return json({ error: `${request.method} is not supported here.` }, 405);
@@ -646,18 +649,40 @@ async function serveStatic(request: Request, ctx: Context, pathname: string): Pr
       { headers: { "content-type": "text/plain; charset=utf-8" } },
     );
   }
-  const relative = pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+  let relative: string;
+  try {
+    relative = pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+  } catch {
+    return json({ error: "Not found." }, 404); // a malformed escape is a 404, not a stack trace
+  }
+  if (relative.includes("\0")) return json({ error: "Not found." }, 404);
   if (ctx.embedded) {
-    const embeddedFile = ctx.embedded[relative];
-    return embeddedFile ? new Response(Bun.file(embeddedFile)) : json({ error: "Not found." }, 404);
+    const embeddedFile = Object.hasOwn(ctx.embedded, relative) ? ctx.embedded[relative] : undefined;
+    return embeddedFile ? asset(Bun.file(embeddedFile)) : json({ error: "Not found." }, 404);
   }
   const file = resolve(ctx.uiDir, relative);
   if (file !== ctx.uiDir && !file.startsWith(ctx.uiDir + sep)) {
     return json({ error: "Not found." }, 404); // Traversal is a 404, not a hint.
   }
-  const asset = Bun.file(file);
-  if (!(await asset.exists())) return json({ error: "Not found." }, 404);
-  return new Response(asset);
+  const found = Bun.file(file);
+  if (!(await found.exists())) return json({ error: "Not found." }, 404);
+  return asset(found);
+}
+
+/**
+ * The webview's own headers: scripts, styles, fonts and requests from this
+ * origin only (the editor writes its styles inline), never framed, never
+ * sniffed, and no referrer, since the token once rode the fragment.
+ */
+function asset(file: Bun.BunFile): Response {
+  return new Response(file, {
+    headers: {
+      "content-security-policy":
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer",
+    },
+  });
 }
 
 function authorized(request: Request, token: string): boolean {

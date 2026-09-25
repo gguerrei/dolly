@@ -1,11 +1,18 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { chmod, writeFile } from "node:fs/promises";
+import { chmod, readdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { FitGitError, type FitStep, fitApply, fitProject, type MoveStep } from "../src/apply/fit";
+import {
+  applyFitPlan,
+  FitGitError,
+  type FitStep,
+  fitApply,
+  fitProject,
+  type MoveStep,
+} from "../src/apply/fit";
 import { rewriteSpecifiers } from "../src/apply/imports";
 import { checkProject } from "../src/check/check";
 import { renderStem } from "../src/extract/naming";
-import { cleanupTempRoots, freshStore, repo, seed } from "./support";
+import { cleanupTempRoots, freshStore, repo, seed, tempDir } from "./support";
 
 afterAll(cleanupTempRoots);
 
@@ -439,5 +446,33 @@ describe("fitApply", () => {
     expect(await Bun.file(join(root, "src/MyHelper.ts")).exists()).toBe(true);
     expect(await Bun.file(join(root, "src/my-helper.ts")).exists()).toBe(false);
     expect(await Bun.file(join(root, "LICENSE")).exists()).toBe(false);
+  });
+});
+
+describe("what a plan may not reach", () => {
+  test.skipIf(process.platform === "win32")("a move never lands through a symlink", async () => {
+    const outside = await tempDir("dolly-outside-");
+    const root = await repo({ "user.test.ts": "export {};\n", "user.ts": "export {};\n" });
+    await symlink(outside, join(root, "src"));
+    const plan = {
+      pattern: "colo",
+      steps: [
+        {
+          kind: "move",
+          rule: "testing",
+          from: "user.test.ts",
+          to: "src/user.test.ts",
+          reason: "",
+          rewrites: [],
+        },
+      ] as FitStep[],
+      declined: [],
+      diagnostics: [],
+    };
+    const result = await applyFitPlan(root, plan);
+    expect(result.applied).toEqual([]);
+    expect(result.failures.join("\n")).toContain("symlink");
+    expect(await readdir(outside)).toEqual([]);
+    expect(await Bun.file(join(root, "user.test.ts")).exists()).toBe(true);
   });
 });

@@ -1,8 +1,8 @@
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { parse as parseYaml } from "yaml";
 import type { Dependencies, Toolchain } from "../pattern/schema";
-import { readIfExists, readJsonSafe } from "../tree/files";
+import { pathWithin, readIfExists, readJsonSafe } from "../tree/files";
 import type { Inventory } from "../tree/inventory";
 import { expandGlobs } from "./globs";
 import { DEV_PURPOSES, type Ecosystem, type Purpose, REGISTRY } from "./registry";
@@ -404,14 +404,14 @@ async function parsePypi(inventory: Inventory, deps: Dep[], notes: string[]): Pr
       notes.push(`${file} is shadowed by pyproject.toml's declared dependencies.`);
       break;
     }
-    await parseRequirements(path, deps, new Set(), "runtime");
+    await parseRequirements(inventory.root, file, deps, new Set(), "runtime");
     declared = fromRequirements = true;
     break; // requirements.in outranks requirements.txt; parse one source only.
   }
   for (const devFile of ["requirements-dev.txt", "dev-requirements.txt", "requirements/dev.txt"]) {
     const path = join(inventory.root, devFile);
     if (!fromRequirements || !(await Bun.file(path).exists())) continue;
-    await parseRequirements(path, deps, new Set(), "dev");
+    await parseRequirements(inventory.root, devFile, deps, new Set(), "dev");
   }
   if (!declared && (await Bun.file(join(inventory.root, "setup.py")).exists())) {
     notes.push("setup.py found; its dependencies are code, not data, and were not extracted.");
@@ -451,27 +451,34 @@ function poetryShape(spec: string): Policy | typeof UNVOTABLE {
   return pypiShape(spec);
 }
 
+/** A requirements file by repository-relative path; an include that would leave the repository is not followed. */
 async function parseRequirements(
-  absPath: string,
+  root: string,
+  rel: string,
   deps: Dep[],
   seen: Set<string>,
   bucket: "runtime" | "dev",
 ): Promise<void> {
-  if (seen.has(absPath)) return;
-  seen.add(absPath);
-  const text = await readIfExists(absPath);
+  if (seen.has(rel)) return;
+  seen.add(rel);
+  const text = await pathWithin(root, rel).then(readIfExists, () => undefined);
   if (text === undefined) return;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     if (line === "" || line.startsWith("#")) continue;
     if (line.startsWith("-r ") || line.startsWith("--requirement ")) {
       const target = line.split(/\s+/)[1];
-      if (target) await parseRequirements(join(absPath, "..", target), deps, seen, bucket);
+      if (target) await parseRequirements(root, relativeTo(rel, target), deps, seen, bucket);
       continue;
     }
     if (line.startsWith("-") || /^https?:/.test(line)) continue;
     addPep508(deps, line, bucket);
   }
+}
+
+/** `-r ../dev.txt` from `requirements/prod.txt` is `dev.txt`: resolved beside the including file, POSIX style. */
+function relativeTo(rel: string, target: string): string {
+  return posix.normalize(posix.join(posix.dirname(rel), target.replaceAll("\\", "/")));
 }
 
 // --- cargo -------------------------------------------------------------
@@ -562,15 +569,15 @@ async function parseGo(inventory: Inventory, deps: Dep[]): Promise<void> {
   const modFiles: string[] = [];
   if (work !== undefined) {
     for (const match of work.matchAll(/^use\s+(?:\(\s*)?([./\w-]+)/gm)) {
-      const dir = (match[1] as string).replace(/^\.\//, "");
-      modFiles.push(join(inventory.root, dir, "go.mod"));
+      modFiles.push(`${(match[1] as string).replace(/^\.\//, "")}/go.mod`);
     }
   } else {
-    modFiles.push(join(inventory.root, "go.mod"));
+    modFiles.push("go.mod");
   }
 
   for (const modFile of modFiles) {
-    const text = await readIfExists(modFile);
+    // A `use` that points out of the repository is not followed.
+    const text = await pathWithin(inventory.root, modFile).then(readIfExists, () => undefined);
     if (text === undefined) continue;
     const internal = new Set<string>();
     for (const match of text.matchAll(/^replace\s+(\S+)\s*=>\s*(\.\.?\/\S*)/gm))

@@ -151,6 +151,8 @@ export interface FitReport {
   applied?: string[];
   verified?: string[];
   failures?: string[];
+  /** The pattern's typecheck and test commands, present when the plan holds translations: Apply runs them as written. */
+  verification?: { typecheck?: string; test?: string };
 }
 
 /** A pattern edit learn proposes, mirrored from @dollysheep/core's Proposal, plus the diff the daemon renders for it. */

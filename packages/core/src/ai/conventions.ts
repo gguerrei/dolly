@@ -8,8 +8,10 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { classifyCode } from "../extract/languages";
 import { type Proposal, pathLabel } from "../learn/drift";
 import type { PatternDocument } from "../pattern/document";
+import { collectInventory } from "../tree/inventory";
 import { type AiClient, activeAi } from "./ai";
 
 /** At most this many convention lines per session, from at most this many changed files. */
@@ -42,10 +44,12 @@ async function draft(
   changedFiles: string[],
   drift: Proposal[],
 ): Promise<Proposal[]> {
+  // Only code the inventory can see: never a .env, a credential, or a path outside the project.
+  const code = new Set((await classifyCode(await collectInventory(root))).files.map((f) => f.path));
+  const shown = changedFiles.filter((file) => code.has(file)).slice(0, MAX_FILES);
+  if (shown.length === 0) return [];
   const excerpts = await Promise.all(
-    changedFiles
-      .slice(0, MAX_FILES)
-      .map(async (file) => `--- ${file}\n${await excerptOf(join(root, file))}`),
+    shown.map(async (file) => `--- ${file}\n${await excerptOf(join(root, file))}`),
   );
   const reply = await client.complete({
     system:
@@ -68,7 +72,7 @@ async function draft(
       "Facet changes the engine already found:",
       drift.length ? drift.map((p) => `- ${pathLabel(p.path)}: ${p.reason}`).join("\n") : "(none)",
       "",
-      `Files changed during the session (${changedFiles.length}, showing ${excerpts.length}):`,
+      `Code files changed during the session (${shown.length}):`,
       ...excerpts,
     ].join("\n"),
     // Five short lines, after whatever reasoning the model spends first; the budget holds both.

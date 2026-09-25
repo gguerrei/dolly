@@ -5,7 +5,7 @@ import type { Toolchain } from "../pattern/schema";
 import { scanRecipes, TASKFILE_NAMES } from "../taskfile";
 import { parseTomlSafe, readJsonSafe } from "../tree/files";
 import { type Inventory, rootFiles as rootEvidenceFiles } from "../tree/inventory";
-import { hasMachinePath } from "./capture";
+import { credentialMarker, hasMachinePath } from "./capture";
 import type { Ecosystem } from "./registry";
 import { detectReleaseTool } from "./releases";
 
@@ -547,6 +547,11 @@ function gatedCapture(sourceId: string, contents: string, notes: string[]): Cand
     notes.push(
       `${sourceId} skipped: it references machine-specific paths; the tool is still recorded.`,
     );
+    return undefined;
+  }
+  const credential = credentialMarker(sourceId, contents);
+  if (credential) {
+    notes.push(`${sourceId} skipped: it holds ${credential}; the tool is still recorded.`);
     return undefined;
   }
   const basename = sourceId.includes("#")

@@ -292,3 +292,14 @@ describe("translation", () => {
     expect(await Bun.file(join(root, "src/greet.ts")).exists()).toBe(true); // left for inspection
   });
 });
+
+describe("what apply will run", () => {
+  test("the dry run names the pattern's judging commands beside the translations", async () => {
+    const { store, root } = await pythonProject({ typecheck: "own-typecheck", test: "own-test" });
+    const plan = await fitProject(store, "ts-service", root, { translate: true });
+    expect(translations(plan).length).toBe(2);
+    expect(plan.verification).toEqual({ typecheck: "own-typecheck", test: "own-test" });
+    const dry = await fitProject(store, "ts-service", root);
+    expect(dry.verification).toBeUndefined(); // no translation planned, nothing to judge
+  });
+});

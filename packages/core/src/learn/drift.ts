@@ -6,13 +6,12 @@
  * check's conversation, not learn's.
  */
 
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { nameRegex } from "../check/rules/layout";
 import { extractPattern } from "../extract/extract";
 import type { LayoutEntry, Pattern } from "../pattern/schema";
 import { isPlainObject } from "../serialize";
 import type { PatternStore } from "../store";
+import { pathWithin, readIfExists } from "../tree/files";
 
 export interface Proposal {
   /** Facet path as segments, since keys carry dots (["toolchain", "configs", "biome.json"]); ["layout"] appends an entry, ["prose"] a convention line. */
@@ -137,7 +136,7 @@ async function configDrift(
     const bytes = fresh.files[relPath];
     if (bytes === undefined) continue;
     const held = current.toolchain?.configs?.[sourceId];
-    const stored = typeof held === "string" ? await readOrNull(join(patternDir, held)) : null;
+    const stored = typeof held === "string" ? await readWithin(patternDir, held) : null;
     if (stored === bytes) continue;
     proposals.push({
       path: ["toolchain", "configs", sourceId],
@@ -153,12 +152,9 @@ async function configDrift(
   return proposals;
 }
 
-async function readOrNull(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, "utf8");
-  } catch {
-    return null;
-  }
+/** A captured file's bytes, or null when it is missing or a symlink would lead outside the pattern. */
+async function readWithin(patternDir: string, rel: string): Promise<string | null> {
+  return (await pathWithin(patternDir, rel).then(readIfExists, () => undefined)) ?? null;
 }
 
 function sameValue(a: unknown, b: unknown): boolean {

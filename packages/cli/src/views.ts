@@ -30,7 +30,7 @@ export function checkView(pattern: string, report: CheckReport): CheckView {
       rule: v.rule,
       path: v.path,
       message: v.message,
-      fixable: v.fix !== undefined,
+      fixable: v.fix !== undefined && v.fix.kind !== "write", // an overwrite is fit's, not check --fix's
       ...(v.severity ? { severity: v.severity } : {}),
     })),
     fixed: report.fixed,

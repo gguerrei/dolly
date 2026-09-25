@@ -6,12 +6,13 @@
  */
 
 import { watch } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { type PatternDocument, serializePatternDocument } from "../pattern/document";
 import { isSafePatternPath, type LayoutEntry, patternSchema } from "../pattern/schema";
-import { isPlainObject } from "../serialize";
+import { BANNED_KEYS, isPlainObject } from "../serialize";
 import type { PatternStore } from "../store";
+import { readIfExists } from "../tree/files";
 import { comparePaths, DENY_DIRS } from "../tree/inventory";
 import { unifiedDiff } from "./diff";
 import { learnDrift, type Proposal } from "./drift";
@@ -46,9 +47,7 @@ export async function renderProposal(
 ): Promise<string> {
   const [relPath, contents] = Object.entries(proposal.files ?? {})[0] ?? [];
   if (relPath !== undefined && contents !== undefined && proposal.before !== undefined) {
-    const held = await readFile(join(store.dirOf(doc.pattern.name), relPath), "utf8").catch(
-      () => "",
-    );
+    const held = (await store.fileOf(doc.pattern.name, relPath).then(readIfExists, () => "")) ?? "";
     return `${relPath}\n${unifiedDiff(held, contents)}`;
   }
   return unifiedDiff(
@@ -75,12 +74,21 @@ export async function saveLearned(
       `A captured file path must stay inside the pattern: ${escaping[0]}`,
     );
   }
+  // Resolved before anything is written: a symlink under a vendored pattern refuses the whole save.
+  const targets: [string, string][] = [];
+  for (const [relPath, contents] of captures) {
+    const target = await store.fileOf(patternName, relPath).catch(() => {
+      throw new UnsafePatternPathError(
+        `A captured file path must stay inside the pattern: ${relPath}`,
+      );
+    });
+    targets.push([target, contents]);
+  }
   const doc = await store.load(patternName);
   await store.save(draftDocument(doc, accepted));
-  const dir = store.dirOf(patternName);
-  for (const [relPath, contents] of captures) {
-    await mkdir(join(dir, dirname(relPath)), { recursive: true });
-    await writeFile(join(dir, relPath), contents);
+  for (const [target, contents] of targets) {
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, contents);
   }
 }
 
@@ -129,6 +137,8 @@ export function watchLearning(
 
 /** Sets a nested value by segments; keys may hold dots, so no dotted-path helper will do. */
 function setAt(target: Record<string, unknown>, path: string[], value: unknown): void {
+  const banned = path.find((key) => BANNED_KEYS.has(key));
+  if (banned) throw new UnsafePatternPathError(`A proposal may not set "${banned}".`);
   let node = target;
   for (const key of path.slice(0, -1)) {
     if (!isPlainObject(node[key])) node[key] = {};

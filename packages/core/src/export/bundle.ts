@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { strFromU8, unzipSync, zipSync } from "fflate";
 import { type PatternDocument, parsePatternDocument } from "../pattern/document";
 import { isSafePatternPath, type Pattern } from "../pattern/schema";
 import { PATTERN_FILE, type PatternStore } from "../store";
+import { walkFiles } from "../tree/files";
 
 /** A .dolly bundle is a zip of a pattern directory: pattern.md plus its toolchain/ and templates/ captures. */
 
@@ -79,12 +80,29 @@ export async function importBundle(
   return doc.pattern;
 }
 
+/**
+ * Where a bundle may come from over the wire: https anywhere, or plain
+ * http on this machine only, and never a URL carrying a user name or a
+ * password. The marker's `source:` and `dolly import` share the rule.
+ */
+export function isBundleUrl(source: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(source);
+  } catch {
+    return false;
+  }
+  if (url.username || url.password) return false;
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && ["127.0.0.1", "localhost"].includes(url.hostname);
+}
+
 /** Unzip with sanity caps so a tiny malicious file can't balloon into memory or disk. */
 async function readBundle(source: string, sha256?: string): Promise<Record<string, Uint8Array>> {
   let entryCount = 0;
   let declaredBytes = 0;
   try {
-    const bytes = /^https?:\/\//.test(source)
+    const bytes = /^[a-z]+:\/\//i.test(source)
       ? await fetchBundle(source)
       : new Uint8Array(await readFile(source));
     if (sha256 && createHash("sha256").update(bytes).digest("hex") !== sha256.toLowerCase()) {
@@ -116,6 +134,11 @@ async function readBundle(source: string, sha256?: string): Promise<Record<strin
 
 /** A bundle from the web, under the same size cap as one on disk, so a link is as safe as a file. */
 async function fetchBundle(url: string): Promise<Uint8Array> {
+  if (!isBundleUrl(url)) {
+    throw new InvalidBundleError(
+      `"${url}" is not an https URL (plain http is for this machine only), so it was not fetched.`,
+    );
+  }
   let response: Response;
   try {
     response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
@@ -124,6 +147,10 @@ async function fetchBundle(url: string): Promise<Uint8Array> {
   }
   if (!response.ok)
     throw new InvalidBundleError(`Could not fetch "${url}": HTTP ${response.status}`);
+  // A redirect may not lead somewhere the rule would have refused.
+  if (response.url && !isBundleUrl(response.url)) {
+    throw new InvalidBundleError(`"${url}" redirected to ${response.url}, which was not read.`);
+  }
   const chunks: Uint8Array[] = [];
   let total = 0;
   for await (const chunk of response.body ?? []) {
@@ -154,12 +181,5 @@ function parseBundledPattern(file: Uint8Array | undefined, bundlePath: string): 
 }
 
 /** List every regular file under dir as /-separated relative paths. */
-async function listFiles(dir: string): Promise<string[]> {
-  const files: string[] = [];
-  for (const name of await readdir(dir, { recursive: true })) {
-    const relative = name.replaceAll("\\", "/");
-    // lstat so symlinks are skipped: a shared bundle must never pack bytes from outside the dir.
-    if ((await lstat(join(dir, relative))).isFile()) files.push(relative);
-  }
-  return files;
-}
+/** Every file the bundle carries: never one a symlink leads to, since a shared bundle must never pack bytes from outside the directory. */
+const listFiles = walkFiles;

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { symlink } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { checkProject } from "../src/check/check";
 import { extractFromRepos, extractPattern, saveExtractedPattern } from "../src/extract/extract";
@@ -7,7 +7,7 @@ import { normalizeStem, scanNaming } from "../src/extract/naming";
 import { placementOf } from "../src/extract/testing";
 import { parsePatternDocument, serializePatternDocument } from "../src/pattern/document";
 import { collectInventory } from "../src/tree/inventory";
-import { cleanupTempRoots, freshStore, repo } from "./support";
+import { cleanupTempRoots, freshStore, repo, tempDir } from "./support";
 
 afterAll(cleanupTempRoots);
 
@@ -1212,5 +1212,123 @@ describe("extract end to end", () => {
     expect(document.pattern.name).toBe("empty-ish");
     expect(document.pattern.layout).toEqual([]);
     expect(() => parsePatternDocument(serializePatternDocument(document))).not.toThrow();
+  });
+});
+
+describe("what a stranger's tree cannot do", () => {
+  const posix = test.skipIf(process.platform === "win32");
+
+  posix("a symlinked version file is never read, and a pin is one short line", async () => {
+    const outside = await tempDir("dolly-outside-");
+    await writeFile(join(outside, "secret"), "TOPSECRET\n");
+    const root = await repo({
+      "package.json": JSON.stringify({ name: "pins" }),
+      "src/a.ts": "export {};\n",
+      "src/b.ts": "export {};\n",
+      ".python-version": "3.12\nexport TOKEN=abc\n",
+      ".ruby-version": "ruby-3.3.0\n",
+    });
+    await symlink(join(outside, "secret"), join(root, ".nvmrc"));
+    const { document } = await extractPattern(root, "pins");
+    expect(document.pattern.languages?.versions).toEqual({ ruby: "3.3.0" });
+  });
+
+  test("requirements includes and go.work uses never leave the repository", async () => {
+    const outside = await tempDir("dolly-outside-");
+    await writeFile(join(outside, "secrets.txt"), "AKIAIOSFODNN7EXAMPLE\n");
+    await mkdir(join(outside, "mod"), { recursive: true });
+    await writeFile(
+      join(outside, "mod", "go.mod"),
+      "module leaked\n\nrequire github.com/leaked/lib v1.0.0\n",
+    );
+    const py = await repo({
+      "pyproject.toml": '[project]\nname = "py"\n',
+      "requirements.txt":
+        "-r ../../../../../../../../tmp/nowhere.txt\n-r ../outside/secrets.txt\nrequests\n",
+      "src/a.py": "x = 1\n",
+      "src/b.py": "x = 1\n",
+    });
+    await symlink(outside, join(py, "outside")).catch(() => undefined);
+    const fromPy = await extractPattern(py, "py");
+    expect(JSON.stringify(fromPy)).not.toContain("akiaiosfodnn7example");
+    const go = await repo({
+      "go.work": "go 1.22\n\nuse ../outside/mod\n",
+      "main.go": "package main\n",
+      "util.go": "package main\n",
+    });
+    const fromGo = await extractPattern(go, "go");
+    expect(JSON.stringify(fromGo)).not.toContain("leaked");
+  });
+
+  test("credential files and secret shapes never become templates or captured configs", async () => {
+    const root = await repo({
+      "package.json": JSON.stringify({ name: "mono", workspaces: ["apps/*"] }),
+      ".prettierrc": '{ "semi": false, "token": "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123" }\n',
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
+      "apps/web/.env": "API_KEY=shared\n",
+      "apps/web/index.ts": "export {};\n",
+      "apps/api/package.json": JSON.stringify({ name: "api" }),
+      "apps/api/.env": "API_KEY=shared\n",
+      "apps/api/index.ts": "export {};\n",
+      "apps/admin/package.json": JSON.stringify({ name: "admin" }),
+      "apps/admin/.env": "API_KEY=shared\n",
+      "apps/admin/index.ts": "export {};\n",
+    });
+    const { document, files } = await extractPattern(root, "mono");
+    expect(Object.keys(files)).not.toContain("templates/apps/{name}/.env");
+    expect(Object.keys(files)).not.toContain("toolchain/.prettierrc");
+    expect(document.prose).toContain(
+      "apps/{name}/.env not captured as a template: holds a credential file by name",
+    );
+    expect(document.prose).toContain(".prettierrc skipped: it holds what looks like a secret");
+    expect(JSON.stringify(files)).not.toContain("ghp_");
+  });
+
+  posix("a repository's own git config cannot make extract run a program", async () => {
+    const root = await repo({ "README.md": "# r\n", "src/a.ts": "export {};\n" });
+    const git = async (...args: string[]) => {
+      const child = Bun.spawn(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe" });
+      const [code, out, err] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      if (code !== 0) throw new Error(`git ${args.join(" ")}: ${err}`);
+      return out.trim();
+    };
+    await git("init", "-q");
+    await git("config", "user.email", "x@test");
+    await git("config", "user.name", "x");
+    await git("add", "-A");
+    await git("commit", "-q", "-m", "feat: first");
+    // A commit object carrying a signature header, so git log would call gpg.program to verify it.
+    const tree = await git("rev-parse", "HEAD^{tree}");
+    const raw = [
+      `tree ${tree}`,
+      "author x <x@test> 1700000000 +0000",
+      "committer x <x@test> 1700000000 +0000",
+      "gpgsig -----BEGIN PGP SIGNATURE-----",
+      " ",
+      " iQEzBAABCAAdFiEEfake",
+      " -----END PGP SIGNATURE-----",
+      "",
+      "feat: signed",
+      "",
+    ].join("\n");
+    const hasher = Bun.spawn(["git", "hash-object", "-t", "commit", "-w", "--stdin"], {
+      cwd: root,
+      stdin: new TextEncoder().encode(raw),
+      stdout: "pipe",
+    });
+    const sha = (await new Response(hasher.stdout).text()).trim();
+    await git("update-ref", "HEAD", sha);
+    const marker = join(root, "gpg-ran");
+    await writeFile(join(root, "fake-gpg"), `#!/bin/sh\ntouch "${marker}"\nexit 0\n`, {
+      mode: 0o755,
+    });
+    await git("config", "log.showSignature", "true");
+    await git("config", "gpg.program", join(root, "fake-gpg"));
+    await extractPattern(root, "signed");
+    expect(await Bun.file(marker).exists()).toBe(false);
   });
 });

@@ -12,6 +12,14 @@ export type Route =
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#/, "");
+  try {
+    return parseRoute(path);
+  } catch {
+    return { view: "library" }; // a malformed escape in the hash is nowhere, not a blank tab
+  }
+}
+
+function parseRoute(path: string): Route {
   const pattern = path.match(/^\/pattern\/(.+)$/);
   if (pattern) return { view: "pattern", name: decodeURIComponent(pattern[1] ?? "") };
   if (path === "/check") return { view: "check" };

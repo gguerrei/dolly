@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import {
   type AiStatus,
@@ -48,6 +48,7 @@ import {
   serializePatternDocument,
   useAi,
   VENDOR_DIR,
+  type Violation,
   verifyAi,
   watchLearning,
   watchProject,
@@ -412,7 +413,7 @@ program
 
     // A captured file is the author's own bytes: opened in place, nothing to validate.
     if (file) {
-      const target = store.fileOf(name, file);
+      const target = await store.fileOf(name, file);
       if (!(await Bun.file(target).exists())) {
         const files = await store.files(name);
         throw new Error(
@@ -424,8 +425,8 @@ program
       return;
     }
 
-    // The editor works on a copy; the store's own file changes only once the copy parses.
-    const draft = join(tmpdir(), `dolly-edit-${name}-${process.pid}.md`);
+    // The editor works on a copy in a directory of its own; the store's file changes only once the copy parses.
+    const draft = join(await mkdtemp(join(tmpdir(), "dolly-edit-")), `${name}.md`);
     await copyFile(store.pathOf(name), draft);
     let editing = true;
     while (editing) {
@@ -434,7 +435,7 @@ program
       try {
         const doc = parsePatternDocument(source);
         await writeFile(store.pathOf(name), source);
-        await rm(draft, { force: true });
+        await rm(dirname(draft), { recursive: true, force: true });
         console.log(`"${name}" saved and valid.`);
         if (doc.pattern.name !== name) {
           console.log(
@@ -505,12 +506,23 @@ program
   .option("--sha256 <hex>", "read the bundle only if its bytes hash to this")
   .description("Add a shared .dolly bundle to your patterns.")
   .action(async (source: string, options: { force?: boolean; sha256?: string }) => {
-    const pattern = await importBundle(new PatternStore(), source, {
+    const store = new PatternStore();
+    const pattern = await importBundle(store, source, {
       force: options.force,
       sha256: options.sha256,
     });
     const description = pattern.description ? `: ${pattern.description}` : "";
     console.log(`Imported "${pattern.name}"${description}`);
+    // What a stranger's pattern can make dolly run: said once, here, where it arrives.
+    const { commands } = (await store.load(pattern.name)).pattern;
+    const judging = Object.entries(commands ?? {}).filter(
+      ([verb]) => verb === "typecheck" || verb === "test",
+    );
+    if (judging.length > 0) {
+      console.log(
+        `Its commands, which \`dolly fit --apply\` runs in a project to judge a translation and \`dolly new\` writes into a scaffold: ${judging.map(([verb, command]) => `${verb}: ${command}`).join("; ")}.`,
+      );
+    }
   });
 
 program
@@ -670,8 +682,13 @@ function printFitPlan(name: string, plan: FitPlan): void {
   if (translations.length > 0) {
     const bytes = translations.reduce((n, s) => n + (s.kind === "translate" ? s.bytes : 0), 0);
     console.log(
-      `${translations.length} file${translations.length === 1 ? "" : "s"} (${Math.ceil(bytes / 1024)} KiB) would go to the model under --apply; the pattern's typecheck and test commands judge the result before any source is removed.`,
+      `${translations.length} file${translations.length === 1 ? "" : "s"} (${Math.ceil(bytes / 1024)} KiB) would go to the model under --apply; the pattern's commands judge the result before any source is removed, run in this project as they are written:`,
     );
+    for (const [verb, command] of Object.entries(plan.verification ?? {})) {
+      console.log(`        ${verb}: ${command}`);
+    }
+    if (Object.keys(plan.verification ?? {}).length === 0)
+      console.log("        (none: unverified)");
   }
   if (plan.declined.length > 0) {
     if (plan.steps.length > 0) console.log("");
@@ -769,6 +786,10 @@ function failing(report: CheckReport): boolean {
   return report.violations.some((v) => v.severity !== "warning");
 }
 
+/** What `check --fix` would take: a plan, except the overwrite that is fit's. */
+const fixable = (violation: Violation) =>
+  violation.fix !== undefined && violation.fix.kind !== "write";
+
 function printCheckReport(name: string, report: CheckReport): void {
   for (const line of report.fixed) console.log(`fixed  ${line}`);
   // Pattern defects are the pattern author's to fix, shown apart from the
@@ -788,14 +809,14 @@ function printCheckReport(name: string, report: CheckReport): void {
   }
   if (report.fixed.length > 0 || report.diagnostics.length > 0) console.log("");
   for (const v of report.violations) {
-    const tags = `${v.fix ? " [fixable]" : ""}${v.severity === "warning" ? " [warning]" : ""}`;
+    const tags = `${fixable(v) ? " [fixable]" : ""}${v.severity === "warning" ? " [warning]" : ""}`;
     console.log(`${v.rule.padEnd(8)} ${v.path}: ${v.message}${tags}`);
   }
-  const fixable = report.violations.filter((v) => v.fix).length;
+  const fixes = report.violations.filter(fixable).length;
   const warnings = report.violations.filter((v) => v.severity === "warning").length;
   const plural = report.violations.length === 1 ? "" : "s";
   const notes = [
-    ...(fixable > 0 ? [`${fixable} fixable; run \`dolly check --fix\``] : []),
+    ...(fixes > 0 ? [`${fixes} fixable; run \`dolly check --fix\``] : []),
     ...(warnings > 0
       ? [`${warnings} warning${warnings === 1 ? "" : "s"} by .dolly, not counted`]
       : []),

@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { applyEdits, modify } from "jsonc-parser";
 import { unifiedDiff } from "../learn/diff";
 import { BANNED_KEYS, getDeep, isPlainObject, serializeByExtension, setDeep } from "../serialize";
+import { pathWithin } from "../tree/files";
 import { deepEqual, parseLoose } from "./support";
 
 /**
@@ -49,14 +50,18 @@ export type FixPlan =
  */
 export type FixOutcome = "applied" | "skipped";
 
-/** The one place a fix touches the disk. */
+/** The one place a fix touches the disk: never through a symlink, never out of the project. */
 export async function applyFix(root: string, plan: FixPlan): Promise<FixOutcome> {
-  const target = join(root, plan.path);
+  const target = await pathWithin(root, plan.path);
   switch (plan.kind) {
     case "create": {
-      if (await Bun.file(target).exists()) return "skipped";
       await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, plan.contents);
+      try {
+        await writeFile(target, plan.contents, { flag: "wx" }); // the disk decides absence, atomically
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") return "skipped";
+        throw error;
+      }
       return "applied";
     }
     case "write": {

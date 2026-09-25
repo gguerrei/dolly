@@ -15,7 +15,11 @@ export function expandGlobs(globs: string[], dirs: string[]): string[] {
 
 /** Whether one segment glob (`*`, `**`) matches a path; the marker's ignore list uses it too. */
 export function matchesGlob(glob: string, dir: string): boolean {
-  const gs = glob.replace(/\/$/, "").split("/");
+  // `a/**/**/b` means `a/**/b`; collapsing keeps the match linear in the path's length.
+  const gs = glob
+    .replace(/\/$/, "")
+    .replace(/(\/?\*\*)+(\/\*\*)+/g, "$1")
+    .split("/");
   const ds = dir.split("/");
   const match = (gi: number, di: number): boolean => {
     if (gi === gs.length) return di === ds.length;

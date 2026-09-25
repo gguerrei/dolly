@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { strToU8, unzipSync, zipSync } from "fflate";
@@ -7,10 +7,12 @@ import {
   exportBundle,
   InvalidBundleError,
   importBundle,
+  isBundleUrl,
   PatternExistsError,
 } from "../src/export/bundle";
 import { parsePatternDocument } from "../src/pattern/document";
 import { PatternNotFoundError, PatternStore } from "../src/store";
+import { seed, tempDir } from "./support";
 
 const tempRoots: string[] = [];
 
@@ -176,4 +178,41 @@ describe("bundles", () => {
     expect(readFile(join(target.root, "tidy-python", "stray.txt"))).rejects.toThrow();
     expect((await target.load("tidy-python")).pattern.name).toBe("tidy-python");
   });
+});
+
+describe("what a bundle may reach", () => {
+  test("a bundle URL is https, or http on this machine, and never carries a user", () => {
+    expect(isBundleUrl("https://example.test/p.dolly")).toBe(true);
+    expect(isBundleUrl("http://127.0.0.1:8080/p.dolly")).toBe(true);
+    expect(isBundleUrl("http://localhost/p.dolly")).toBe(true);
+    expect(isBundleUrl("http://example.test/p.dolly")).toBe(false);
+    expect(isBundleUrl("http://127.0.0.1@example.test/p.dolly")).toBe(false);
+    expect(isBundleUrl("https://user:pw@example.test/p.dolly")).toBe(false);
+    expect(isBundleUrl("ftp://example.test/p.dolly")).toBe(false);
+  });
+
+  test("import refuses a plain http URL off this machine before any fetch", async () => {
+    const store = await freshStore();
+    await expect(importBundle(store, "http://example.test/p.dolly")).rejects.toThrow(
+      "not an https URL",
+    );
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "a bundle never packs what a symlink leads to",
+    async () => {
+      const store = await freshStore();
+      await seed(store, { name: "linked" });
+      const outside = await tempDir("dolly-outside-");
+      await writeFile(join(outside, "secret.txt"), "TOPSECRET\n");
+      const dir = store.dirOf("linked");
+      await mkdir(join(dir, "toolchain"), { recursive: true });
+      await writeFile(join(dir, "toolchain", "own.json"), "{}\n");
+      await symlink(outside, join(dir, "toolchain", "link"));
+      const out = join(await tempDir("dolly-bundle-"), "linked.dolly");
+      await exportBundle(store, "linked", out);
+      const names = Object.keys(unzipSync(new Uint8Array(await readFile(out))));
+      expect(names.sort()).toEqual(["pattern.md", "toolchain/own.json"]);
+    },
+  );
 });

@@ -339,21 +339,28 @@ async function classifyByShebang(absPath: string): Promise<LanguageEntry | undef
   return undefined;
 }
 
+/** A version file holds one short pin ("20.11", "lts/iron", "ruby-3.3.0"); anything else is not one. */
+function pinIn(text: string | undefined): string | undefined {
+  const line = text?.trim();
+  return line && /^[A-Za-z0-9][\w./+~-]{0,63}$/.test(line) ? line : undefined;
+}
+
 /** Runtime pins from the files that declare them; keys are runtime names. */
 async function collectVersions(inventory: Inventory): Promise<Record<string, string>> {
   const versions: Record<string, string> = {};
   const root = inventory.root;
 
-  const nvmrc =
-    (await readIfExists(join(root, ".nvmrc"))) ?? (await readIfExists(join(root, ".node-version")));
-  if (nvmrc?.trim()) versions.node = nvmrc.trim();
+  const nvmrc = pinIn(
+    (await readIfExists(join(root, ".nvmrc"))) ?? (await readIfExists(join(root, ".node-version"))),
+  );
+  if (nvmrc) versions.node = nvmrc;
 
   const packageJson = await readJsonSafe(join(root, "package.json"));
   const engines = packageJson?.engines as Record<string, string> | undefined;
   for (const [runtime, range] of Object.entries(engines ?? {})) versions[runtime] = range;
 
-  const pythonVersion = await readIfExists(join(root, ".python-version"));
-  if (pythonVersion?.trim()) versions.python = pythonVersion.trim();
+  const pythonVersion = pinIn(await readIfExists(join(root, ".python-version")));
+  if (pythonVersion) versions.python = pythonVersion;
   // Parsed, not regexed: a `requires-python =` line inside a string or an
   // unrelated table must not count as the project's pin.
   const pyproject = parseTomlSafe(await readIfExists(join(root, "pyproject.toml")));
@@ -372,15 +379,15 @@ async function collectVersions(inventory: Inventory): Promise<Record<string, str
     )?.["rust-version"];
   if (typeof rustVersion === "string") versions.rust = rustVersion;
 
-  const rubyVersion = await readIfExists(join(root, ".ruby-version"));
-  if (rubyVersion?.trim()) versions.ruby = rubyVersion.trim().replace(/^ruby-/, "");
+  const rubyVersion = pinIn(await readIfExists(join(root, ".ruby-version")));
+  if (rubyVersion) versions.ruby = rubyVersion.replace(/^ruby-/, "");
   const gemfileRuby = (await readIfExists(join(root, "Gemfile")))?.match(
     /^ruby\s+["']([^"']+)["']/m,
   )?.[1];
   if (gemfileRuby) versions.ruby = gemfileRuby;
 
-  const javaVersion = await readIfExists(join(root, ".java-version"));
-  if (javaVersion?.trim()) versions.java = javaVersion.trim();
+  const javaVersion = pinIn(await readIfExists(join(root, ".java-version")));
+  if (javaVersion) versions.java = javaVersion;
   const pom = await readIfExists(join(root, "pom.xml"));
   const pomJava = pom?.match(
     /<(?:maven\.compiler\.(?:release|source|target)|java\.version)>\s*([^<\s]+)\s*</,

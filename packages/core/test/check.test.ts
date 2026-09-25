@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, unlink, utimes, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fitProject } from "../src/apply/fit";
 import { scaffoldProject } from "../src/apply/new";
 import { checkProject } from "../src/check/check";
 import { exportBundle } from "../src/export/bundle";
@@ -157,9 +158,13 @@ describe("checkProject", () => {
       "biome.json": '{ "formatter": { "enabled": true }, "extra": 1 }\n',
     });
     const found = await checkProject(store, "verby", project);
-    expect(messages(found)).toContain("verbatim");
-    await checkProject(store, "verby", project, { fix: true });
-    expect(await Bun.file(join(project, "biome.json")).text()).toBe(captured);
+    expect(messages(found)).toContain("verbatim binding); `dolly fit` rewrites it");
+    // An overwrite is never check --fix's: it is fit's, behind the checkpoint branch.
+    const fixed = await checkProject(store, "verby", project, { fix: true });
+    expect(fixed.fixed).toEqual([]);
+    expect(await Bun.file(join(project, "biome.json")).text()).not.toBe(captured);
+    const plan = await fitProject(store, "verby", project);
+    expect(plan.steps.map((s) => (s.kind === "fix" ? s.plan.kind : s.kind))).toContain("write");
   });
 
   test("an unstructured capture that drifted is reported but never clobbered", async () => {
@@ -817,5 +822,39 @@ describe("checkProject", () => {
     expect(await Bun.file(join(project, ".editorconfig")).text()).toBe("root = true\n");
     expect(report.fixed.filter((line) => line.startsWith(".editorconfig")).length).toBe(1);
     expect(report.violations).toEqual([]);
+  });
+});
+
+describe("what a committed symlink cannot do", () => {
+  const posix = test.skipIf(process.platform === "win32");
+
+  posix(
+    "a fix never writes through a symlink, so a hostile tree cannot reach outside itself",
+    async () => {
+      const store = await freshStore();
+      await seed(store, { name: "tidy", layout: [{ path: "docs/README.md", required: true }] });
+      const outside = await tempDir("dolly-outside-");
+      await mkdir(join(outside, "dir"), { recursive: true });
+      await writeFile(join(outside, "rc"), "# shell rc\n");
+      const project = await repo({ ".dolly": "pattern: tidy\n", ".env": "SECRET=1\n" });
+      await symlink(join(outside, "dir"), join(project, "docs"));
+      await symlink(join(outside, "rc"), join(project, ".gitignore"));
+      const report = await checkProject(store, "tidy", project, { fix: true });
+      expect(report.fixed).toEqual([]);
+      expect(report.diagnostics.join("\n")).toContain("symlink");
+      expect(await readdir(join(outside, "dir"))).toEqual([]);
+      expect(await readFile(join(outside, "rc"), "utf8")).toBe("# shell rc\n");
+    },
+  );
+
+  posix("a marker's source directory and the vendoring target may not be symlinks", async () => {
+    const store = await freshStore();
+    await seed(store, { name: "tidy" });
+    const elsewhere = await tempDir("dolly-elsewhere-");
+    const project = await repo({ ".dolly": "pattern: tidy\nsource: dolly\n" });
+    await symlink(elsewhere, join(project, "dolly"));
+    await expect(resolvePattern(await freshStore(), project)).rejects.toThrow("symlink");
+    await expect(linkProject(project, "tidy", { vendorFrom: store })).rejects.toThrow("symlink");
+    expect(await readdir(elsewhere)).toEqual([]);
   });
 });

@@ -1,9 +1,14 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { patternSchema } from "../src/pattern/schema";
-import { InvalidPatternNameError, PatternNotFoundError, PatternStore } from "../src/store";
+import {
+  InvalidPatternFileError,
+  InvalidPatternNameError,
+  PatternNotFoundError,
+  PatternStore,
+} from "../src/store";
 
 const tempRoots: string[] = [];
 
@@ -108,5 +113,32 @@ describe("PatternStore", () => {
     expect(listed).toHaveLength(1);
     expect(listed[0]?.name).toBe("broken");
     expect(listed[0]?.error).toContain("Invalid pattern facets");
+  });
+});
+
+describe("what a symlink under a pattern cannot do", () => {
+  const posix = test.skipIf(process.platform === "win32");
+
+  posix("files() never enters a linked directory, and fileOf() refuses a linked file", async () => {
+    const store = await freshStore();
+    await store.save({ pattern: patternSchema.parse({ name: "linked" }), prose: "" });
+    const outside = await mkdtemp(join(tmpdir(), "dolly-outside-"));
+    await writeFile(join(outside, "secret.txt"), "TOPSECRET\n");
+    const dir = store.dirOf("linked");
+    await mkdir(join(dir, "toolchain"), { recursive: true });
+    await writeFile(join(dir, "toolchain", "own.json"), "{}\n");
+    await symlink(outside, join(dir, "toolchain", "link"));
+    await symlink(join(outside, "secret.txt"), join(dir, "toolchain", "direct.txt"));
+    expect(await store.files("linked")).toEqual(["toolchain/own.json"]);
+    await expect(store.fileOf("linked", "toolchain/direct.txt")).rejects.toThrow(
+      InvalidPatternFileError,
+    );
+    await expect(store.fileOf("linked", "toolchain/link/secret.txt")).rejects.toThrow(
+      InvalidPatternFileError,
+    );
+    expect(await store.fileOf("linked", "toolchain/own.json")).toBe(
+      join(dir, "toolchain", "own.json"),
+    );
+    await rm(outside, { recursive: true, force: true });
   });
 });

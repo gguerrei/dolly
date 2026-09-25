@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Scaffold } from "../pattern/schema";
 import { comparePaths, type Inventory } from "../tree/inventory";
-import { hasMachinePath, identityMarker, isBinary, wholeWord } from "./capture";
+import { credentialMarker, hasMachinePath, identityMarker, isBinary, wholeWord } from "./capture";
 import type { ProjectIdentity } from "./identity";
 import type { TemplateGroup } from "./layout";
 
@@ -54,6 +54,11 @@ export async function scanScaffold(
       }
       if (hasMachinePath(contents)) {
         blocked = "references machine-specific paths";
+        break;
+      }
+      const credential = credentialMarker(member.path, contents);
+      if (credential) {
+        blocked = `holds ${credential}`;
         break;
       }
       // dolly's own placeholder must be unambiguous on instantiation, so a

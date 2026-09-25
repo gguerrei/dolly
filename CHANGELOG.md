@@ -9,9 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Nothing yet.
 
-## [0.1.0] (2026-09-11)
+## [0.1.0] (2026-09-25)
 
 The first release: everything below landed between the bootstrap and today.
+
+### Security
+
+The sweep before going public (SECURITY.md says what dolly trusts):
+
+- No read or write follows a symlink: every project and pattern path goes
+  through one gate, so a committed link cannot carry `check --fix`,
+  `fit --apply`, `learn`, `link --vendor` or `extract` outside the tree, and
+  a bundle never packs what a link leads to.
+- A pattern's `testing.filePattern` names one file; its command verbs may
+  not be npm lifecycle names; `check --fix` never overwrites, the verbatim
+  binding is fit's behind a checkpoint.
+- The fit dry run names the typecheck and test commands apply will run,
+  and `dolly import` names them on arrival.
+- Extract refuses credential files and secret shapes as templates or
+  configs, keeps requirements and go.work includes inside the repository,
+  reads a version file as one short pin, and runs git with the
+  repository's own signature verifier, filesystem monitor and hooks off.
+- Learn's convention draft sends the model only code files the inventory
+  can see, and a proposal cannot set a prototype key.
+- The daemon serves the webview with a content security policy, `nosniff`
+  and no referrer, answers a malformed path with a 404 instead of bun's
+  error page, and a bundle URL is https, or http on this machine, with no
+  user name and no downgrading redirect.
+- The release workflows run pinned action commits with least privilege,
+  ship `SHA256SUMS`, and publish to npm only when the GitHub release is
+  published, with the token reaching the publish step alone.
 
 ### Added
 

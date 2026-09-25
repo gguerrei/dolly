@@ -14,6 +14,7 @@ import { isSafePatternPath, type Pattern, slugify } from "../pattern/schema";
 import { isSafeDottedPath, parseByExtension, serializeByExtension, setDeep } from "../serialize";
 import type { PatternStore } from "../store";
 import { taskfile } from "../taskfile";
+import { pathWithin, readIfExists } from "../tree/files";
 import { comparePaths } from "../tree/inventory";
 import { renderChangelog } from "./changelog";
 import { gitignoreFor, stubContents } from "./content";
@@ -134,14 +135,13 @@ export async function scaffoldProject(
       notes.push(`Config source "${sourceId}" is not a safe relative path; skipped.`);
       continue;
     }
-    const file = Bun.file(join(patternDir, patternRel));
-    if (!(await file.exists())) {
+    const contents = await pathWithin(patternDir, patternRel).then(readIfExists, () => undefined);
+    if (contents === undefined) {
       notes.push(
         `Captured config ${patternRel} is missing from the pattern; ${target} not written.`,
       );
       continue;
     }
-    const contents = await file.text();
     const hash = sourceId.indexOf("#");
     captured.add(target);
     if (hash === -1) files.set(target, contents);
@@ -251,14 +251,15 @@ export async function scaffoldProject(
       notes.push(`Template ${target} skipped: a captured config already owns ${expanded}.`);
       continue;
     }
-    const file = Bun.file(join(patternDir, "templates", target));
-    if (!(await file.exists())) {
+    const raw = await pathWithin(patternDir, `templates/${target}`).then(
+      readIfExists,
+      () => undefined,
+    );
+    if (raw === undefined) {
       notes.push(`Template ${target} is missing from the pattern; ${expanded} not written.`);
       continue;
     }
-    const contents = (await file.text())
-      .replaceAll("{{name}}", projectName)
-      .replaceAll("{{project}}", projectName);
+    const contents = raw.replaceAll("{{name}}", projectName).replaceAll("{{project}}", projectName);
     files.set(expanded, contents);
   }
 

@@ -1,0 +1,38 @@
+name: Publish
+
+# Publishing the release on GitHub, after the maintainer has read the draft,
+# is what puts the two npm packages out: @dollysheep/core first, then
+# dollysheep. The token reaches only the step that publishes, never the
+# install or the build, and the workflow says so and stops when the
+# repository has no NPM_TOKEN secret.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run build:core
+      - run: bun run build:npm
+      - name: Publish @dollysheep/core and dollysheep
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_CONFIG_TOKEN" ]; then
+            echo "NPM_TOKEN is not set in the repository's secrets; the packages were built but not published."
+            exit 0
+          fi
+          bun publish --cwd packages/core/dist --access public
+          bun publish --cwd packages/cli --access public

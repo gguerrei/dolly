@@ -1,5 +1,5 @@
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { basename, delimiter, join, resolve } from "node:path";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { checkProject } from "../check/check";
 import { applyFix, type FixPlan, losingCreates, previewFix } from "../check/fix";
 import type { Violation } from "../check/rule";
@@ -11,6 +11,7 @@ import { MARKER_FILE, markerContents } from "../marker";
 import type { CaseStyle, Pattern } from "../pattern/schema";
 import { slugify } from "../pattern/schema";
 import type { PatternStore } from "../store";
+import { pathWithin } from "../tree/files";
 import { runGit } from "../tree/git";
 import { collectInventory } from "../tree/inventory";
 import {
@@ -107,6 +108,12 @@ export interface FitPlan {
   declined: DeclinedItem[];
   /** Pattern defects, straight from check. */
   diagnostics: string[];
+  /**
+   * The pattern's own typecheck and test commands, present when the plan
+   * holds translations: apply runs them in the project to judge the
+   * result, so the dry run shows the exact strings before anyone agrees.
+   */
+  verification?: { typecheck?: string; test?: string };
 }
 
 export class FitGitError extends Error {
@@ -367,7 +374,15 @@ export async function fitProject(
     });
   }
 
-  return { pattern: patternName, steps, declined, diagnostics: report.diagnostics };
+  return {
+    pattern: patternName,
+    steps,
+    declined,
+    diagnostics: report.diagnostics,
+    ...(steps.some((step) => step.kind === "translate")
+      ? { verification: judgingCommands(pattern) }
+      : {}),
+  };
 }
 
 function namingMove(
@@ -485,6 +500,12 @@ function testingMove(
   return { declined: "the project has no test directory yet; create one first" };
 }
 
+/** The commands apply will run to judge a translation, named so the dry run can show them. */
+function judgingCommands(pattern: Pattern): { typecheck?: string; test?: string } {
+  const { typecheck, test } = pattern.commands ?? {};
+  return { ...(typecheck ? { typecheck } : {}), ...(test ? { test } : {}) };
+}
+
 /** One languages violation as a translate step, or the reason it is not one (ADR-0004's bounds). */
 function translation(
   violation: Violation,
@@ -570,7 +591,7 @@ export async function applyFitPlan(
   }
   for (const [file, rewrites] of byFile) {
     await attempt(`rewrite imports in ${file}`, async () => {
-      const absolute = join(root, file);
+      const absolute = await pathWithin(root, file);
       await writeFile(absolute, rewriteSpecifiers(await Bun.file(absolute).text(), rewrites));
     });
   }
@@ -585,8 +606,9 @@ export async function applyFitPlan(
     const from = move.from.replace(/\/$/, "");
     const to = move.to.replace(/\/$/, "");
     await attempt(`move ${move.from} → ${move.to}`, async () => {
-      await mkdir(join(root, parentOf(to) === "" ? "." : parentOf(to)), { recursive: true });
-      await rename(join(root, from), join(root, to));
+      const [source, target] = [await pathWithin(root, from), await pathWithin(root, to)];
+      await mkdir(dirname(target), { recursive: true });
+      await rename(source, target);
     });
   }
 
@@ -599,10 +621,9 @@ export async function applyFitPlan(
       if (!translator)
         throw new Error("translation needs the AI layer; `dolly ai connect` turns it on");
       const contents = await translator(step, plan, done);
-      await mkdir(join(root, parentOf(step.to) === "" ? "." : parentOf(step.to)), {
-        recursive: true,
-      });
-      await writeFile(join(root, step.to), contents);
+      const target = await pathWithin(root, step.to);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, contents);
       done.push(step);
     });
   }

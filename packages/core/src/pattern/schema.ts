@@ -133,8 +133,27 @@ export const scaffoldSchema = z.strictObject({
  * root, e.g. { test: "bun test", lint: "biome check ." }. `new` writes them
  * into the scaffolded manifest scripts or taskfile.
  */
+const LIFECYCLE_VERBS = new Set([
+  "preinstall",
+  "install",
+  "postinstall",
+  "preprepare",
+  "prepare",
+  "postprepare",
+  "prepublish",
+  "prepack",
+  "postpack",
+  "publish",
+  "postpublish",
+  "dependencies",
+]);
+
 export const commandsSchema = z.record(
-  z.string().regex(/^[a-z][a-z0-9-]*$/, "command verbs are lowercase kebab-case"),
+  z
+    .string()
+    .regex(/^[a-z][a-z0-9-]*$/, "command verbs are lowercase kebab-case")
+    // `new` writes the verbs into package.json scripts, and npm runs these on install.
+    .refine((verb) => !LIFECYCLE_VERBS.has(verb), "command verbs must not be npm lifecycle names"),
   // One line only: `new` writes each command as a single justfile/Makefile
   // recipe line, where a newline would smuggle in extra recipes.
   z
@@ -151,7 +170,14 @@ export const commandsSchema = z.record(
  */
 export const testingSchema = z.strictObject({
   placement: z.enum(["colocated", "separate"]),
-  filePattern: z.string().optional(),
+  filePattern: z
+    .string()
+    .refine(
+      (shape) =>
+        !shape.includes("/") && isSafePatternPath(shape) && shape.split("{stem}").length <= 2,
+      "filePattern names one file, with at most one {stem} and no directory",
+    )
+    .optional(),
 });
 
 /** An SPDX license id or expression, e.g. "MIT" or "(MIT OR Apache-2.0)". */
