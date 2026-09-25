@@ -12,7 +12,7 @@ export const layoutRule: Rule = {
     const dirs = new Set(inventory.dirs);
     const projectName = slugify(basename(root), "project");
     const ecosystem = ecosystemOfPattern(pattern);
-    // A captured file is the config rule's to judge (ADR-0003 rule 4): one report per file.
+    // A captured file is the config rule's to judge (one owner per fact): one report per file.
     const captured = new Set(
       Object.keys(pattern.toolchain?.configs ?? {}).filter((id) => !id.includes("#")),
     );

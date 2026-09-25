@@ -9,7 +9,7 @@ import { invisibleFile, type Rule, type Violation } from "../rule";
 import { existsOnDisk } from "../support";
 
 /**
- * The tree-shaped half of the releases facet (ADR-0005): a hand-kept
+ * The tree-shaped half of the releases facet: a hand-kept
  * changelog must exist, and the release tool's fingerprint must be at the
  * root. Versioning lives in tags and is nobody's path to check.
  */

@@ -4,7 +4,7 @@ import ignore, { type Ignore } from "ignore";
 import { readIfExists } from "./files";
 
 /**
- * The shared file inventory every scanner reads (ADR-0003): one walk, one
+ * The shared file inventory every scanner reads: one walk, one
  * deny policy, one generated-code filter, one deterministic order, so all
  * facets in one pattern rest on the same evidence.
  */
@@ -126,7 +126,7 @@ export async function collectInventory(root: string): Promise<Inventory> {
         await walk(relPath);
       } else if (entry.isFile()) {
         // Gitignore first: an ignored lockfile is absent from a fresh clone,
-        // so counting it would break clone-state invariance (ADR-0003).
+        // so counting it would break clone-state invariance.
         if (isIgnored(relPath, false)) continue;
         if (LOCKFILES.has(name)) {
           lockfiles.push(relPath);

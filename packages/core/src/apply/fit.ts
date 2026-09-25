@@ -24,7 +24,7 @@ import {
 } from "./imports";
 
 /**
- * `dolly fit`: the migration planner (docs/design/fit.md). Plans in check's
+ * `dolly fit`: the migration planner. Plans in check's
  * currency (every fixable violation's FixPlan adopted verbatim) plus the
  * step kind check refuses: `move`, each carrying the import rewrites that
  * keep the tree compiling. The plan is data end to end; a move that cannot
@@ -54,7 +54,7 @@ export interface MoveStep {
 
 /**
  * A file the pattern's languages rule would have written in another
- * language (docs/design/translation.md, ADR-0004). Planned only with the
+ * language, translated behind apply. Planned only with the
  * AI layer on; under apply, the model fills in the bytes and the pattern's
  * own commands judge them before the source is removed.
  */
@@ -71,7 +71,7 @@ export interface TranslateStep {
 
 export type FitStep = FixStep | MoveStep | TranslateStep;
 
-/** ADR-0004's bounds: what one apply may send to the model. */
+/** Translation's bounds: what one apply may send to the model. */
 const TRANSLATE_MAX_FILES = 25;
 const TRANSLATE_MAX_BYTES = 64 * 1024;
 
@@ -80,7 +80,7 @@ export interface FitOptions {
   translate?: boolean;
 }
 
-/** Attached by the AI layer only; apply never reads it (ground rule 3 in docs/design/ai.md). */
+/** Attached by the AI layer only; apply never reads it: a suggestion never becomes a step. */
 export interface PlacementSuggestion {
   pick: string;
   why: string;
@@ -506,7 +506,7 @@ function judgingCommands(pattern: Pattern): { typecheck?: string; test?: string 
   return { ...(typecheck ? { typecheck } : {}), ...(test ? { test } : {}) };
 }
 
-/** One languages violation as a translate step, or the reason it is not one (ADR-0004's bounds). */
+/** One languages violation as a translate step, or the reason it is not one (translation's bounds). */
 function translation(
   violation: Violation,
   pattern: Pattern,
@@ -728,7 +728,7 @@ export async function fitApply(
   let checkpoint: string | undefined = await createCheckpoint(root, patternName);
   const { applied, failures } = await applyFitPlan(root, plan, options.translator);
   // Translations are judged by the pattern's own commands before a single
-  // source is removed (ADR-0004); a failed verification commits nothing.
+  // source is removed; a failed verification commits nothing.
   const translated = plan.steps.filter((s): s is TranslateStep => s.kind === "translate");
   const verified: string[] = [];
   if (translated.length > 0 && failures.length === 0) {

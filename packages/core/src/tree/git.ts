@@ -1,6 +1,6 @@
 /**
  * The engine's one way of asking git a question. Fit's checkpoint and
- * commit, and the two history facets ADR-0005 allows, all go through here,
+ * commit, and the two history facets, all go through here,
  * so "git is missing" and "this is not a repository" mean one thing. The
  * repository may be someone else's, delivered with its .git directory, and
  * git runs programs its config names (a signature verifier, a filesystem

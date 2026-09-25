@@ -4,7 +4,7 @@
  * built webview (apps/desktop/dist), so `bun build --compile` embeds the GUI
  * in the binary and `bun build --target=bun` copies it beside the npm entry.
  * The file is generated, never committed; a plain checkout serves the dist
- * directory instead (docs/design/gui.md, "The daemon serves its own face").
+ * directory instead: the daemon serves its own face.
  */
 import { lstat, readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";

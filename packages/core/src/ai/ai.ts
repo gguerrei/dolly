@@ -2,8 +2,8 @@
  * The AI layer's switch. The active provider and model live in
  * <dollyHome>/ai.json, and the file's absence is "off". Consumers ask
  * activeAi() and get null when the layer is off, which is why no
- * deterministic path ever needs this module (ground rule 1 in
- * docs/design/ai.md). No process state: the CLI and the daemon agree
+ * deterministic path ever needs this module (the layer's first rule: off
+ * means absent, never an error). No process state: the CLI and the daemon agree
  * because both read the file fresh.
  */
 

@@ -11,7 +11,7 @@ import { cleanupTempRoots, freshStore, repo, seed } from "./support";
 
 afterAll(cleanupTempRoots);
 
-/** ADR-0005: the two facets that read history, and the tree they leave untouched. */
+/** The two facets that read history, and the tree they leave untouched. */
 
 async function git(root: string, ...args: string[]): Promise<void> {
   const child = Bun.spawn(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe" });
@@ -161,7 +161,7 @@ describe("the releases scanner", () => {
     const { pattern: fromTarball } = (await extractPattern(tarball, "x")).document;
     expect(fromClone.commits?.style).toBe("conventional");
     expect(fromClone.releases).toEqual({ versioning: "semver" });
-    // The description names the directory (ADR-0003's identity exception), so it is set aside too.
+    // The description names the directory (the identity exception), so it is set aside too.
     const { commits: _c, releases: _r, description: _d, ...rest } = fromClone;
     const { description: _e, ...fromTree } = fromTarball;
     expect(fromTree).toEqual(rest);

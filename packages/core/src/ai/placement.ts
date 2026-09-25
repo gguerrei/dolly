@@ -3,8 +3,8 @@
  * planner enumerates every destination an ambiguous decline could take and
  * refuses to guess between them; with AI on, the model picks one and says
  * why, and the pick rides the declined item as a labeled suggestion. It
- * never becomes a step: apply reads plans, not suggestions (ground rule 3
- * in docs/design/ai.md), so a wrong pick costs a shrug, not a file.
+ * never becomes a step: apply reads plans, not suggestions (the layer's
+ * third rule), so a wrong pick costs a shrug, not a file.
  */
 
 import { readFile } from "node:fs/promises";
@@ -20,7 +20,7 @@ const EXCERPT_BYTES = 4000;
 
 /**
  * fitProject with the AI layer's two planning-time contributions when it
- * is on: translate steps planned rather than declined (ADR-0004), and a
+ * is on: translate steps planned rather than declined, and a
  * labeled suggestion on each ambiguous decline. With it off (or on any
  * failure) the plan comes back exactly as fitProject makes it; the layer
  * is additive or absent.

@@ -8,8 +8,7 @@ import type { Rule, Violation } from "../rule";
  * Dockerfile or helper script is a trace, which extract would not have
  * sanctioned either, and is never held against the pattern. Data, docs, and
  * assets are not code and are never judged. Never fixable here: fit plans
- * the translation, and only with the AI layer on
- * (docs/design/translation.md).
+ * the translation, and only with the AI layer on.
  */
 export const languagesRule: Rule = {
   id: "languages",

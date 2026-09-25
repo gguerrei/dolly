@@ -9,7 +9,7 @@ import { exportBundle } from "./bundle";
 /**
  * `dolly export`: a pattern rendered for the tools that read conventions
  * but never read pattern.md. Every text target is the one brief in a frame
- * (docs/design/exports.md); the bundle is the M1 zip, kept as the default
+ * ; the bundle is the M1 zip, kept as the default
  * so the verb reads as it always did.
  */
 export const EXPORT_TARGETS = [

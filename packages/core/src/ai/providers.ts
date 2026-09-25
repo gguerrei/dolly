@@ -2,7 +2,7 @@
  * The three BYOK adapters behind one interface, all plain fetch. Each
  * provider is one POST to one endpoint with one response shape to unwrap;
  * SDK dependency trees would buy nothing here and would weigh on the
- * compiled binary M9 promises. Design in docs/design/ai.md.
+ * compiled binary promises.
  */
 
 export type ProviderId = "anthropic" | "openai" | "google";

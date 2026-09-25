@@ -1,7 +1,7 @@
 /**
  * Where BYOK keys come from: the environment first, then the OS keychain,
  * reached through the platform's own tool so a compiled dolly never needs a
- * native module. Ground rule 2 in docs/design/ai.md: keys live in those two
+ * native module. The layer's second rule: keys live in those two
  * places and nowhere else, never in files dolly writes.
  */
 

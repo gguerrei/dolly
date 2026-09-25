@@ -232,7 +232,7 @@ program
       }
       return;
     }
-    // With AI on, translate steps are planned and the model fills them in (ADR-0004).
+    // With AI on, translate steps are planned and the model fills them in.
     const result = await assistedFitApply(store, name, options.dir);
     printFitPlan(name, result.plan);
     console.log("");

@@ -4,7 +4,7 @@
  * dependency facets, so an app's business deps never leak into a pattern.
  * A missing entry degrades to a prose note, never a wrong facet, which is why
  * small-and-growing is safe. Tool purposes (lint, format, typecheck, test)
- * are deliberately absent: the toolchain facet owns tool identity (ADR-0003)
+ * are deliberately absent: the toolchain facet owns tool identity
  * and the dependencies facet mirrors its winners.
  */
 export type Ecosystem =
@@ -61,7 +61,7 @@ export const GRADLE_FILES = [
 
 const DOTNET_PROJECT = /\.(csproj|fsproj|vbproj|sln|slnx)$/i;
 
-/** A root manifest by name: a project decision new and check never invent (ADR-0003). */
+/** A root manifest by name: a project decision new and check never invent. */
 export function isManifestName(name: string): boolean {
   return (
     Object.values(MANIFEST_OF).includes(name) ||

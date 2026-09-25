@@ -3,7 +3,7 @@
  * rules judge the facets; the prose conventions only a reader can judge, so
  * under `--conventions` one model call reads them against the code files
  * that changed and reports what it sees in its own section of the report,
- * labeled as its reading and never counted (docs/design/ai.md). With the
+ * labeled as its reading and never counted. With the
  * layer off the flag refuses; without it, nothing here is reached.
  */
 

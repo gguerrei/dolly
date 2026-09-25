@@ -40,8 +40,8 @@ export const configRule: Rule = {
       const structured = /\.(jsonc?|toml)$/i.test(target);
 
       // A gitignored or generated config is invisible to the pattern's eyes,
-      // like any other file: reported, never read or rewritten (ground rule 3
-      // in docs/design/check.md).
+      // like any other file: reported, never read or rewritten (the inventory
+      // decides visibility; only the disk decides absence).
       const projectFile = Bun.file(join(root, target));
       const exists = visible.has(target);
       if (!exists && (await projectFile.exists())) {

@@ -8,7 +8,7 @@ import type { RepoExtract } from "./extract";
  * Several repositories, one pattern: what they agree on. A facet value is
  * kept when a majority of the repositories carry it and every one that
  * does says the same thing; anything else is left out and named in the
- * notes, so the author can promote it by hand (ADR-0003's three-way
+ * notes, so the author can promote it by hand (the extractor's three-way
  * degradation, applied across trees instead of within one). A structured
  * config keeps the keys the repositories share; an unstructured one must
  * match byte for byte. The order the repositories were given breaks ties.

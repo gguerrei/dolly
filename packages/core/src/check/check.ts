@@ -29,7 +29,7 @@ import { testingRule } from "./rules/testing";
  * (fix.ts) applied by the one executor, which is what lets a report
  * travel as JSON and what fit's dry-run diff will build on.
  *
- * Two invariants every rule must keep (docs/design/check.md):
+ * Two invariants every rule must keep:
  * - The inventory decides *visibility*; only the disk decides *absence*. A
  *   file the inventory cannot see (gitignored, generated) may still exist,
  *   and no fix may ever truncate it.

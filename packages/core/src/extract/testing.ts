@@ -8,7 +8,7 @@ import { extensionOf } from "./naming";
  * are called. Placement is `separate` when a test file lives under a test
  * root (test/, tests/, __tests__, spec/), `colocated` otherwise; the file
  * pattern generalizes each basename (`user.test.ts` → `{stem}.test.ts`).
- * Mixed evidence degrades to a counted note, never a facet (ADR-0003).
+ * Mixed evidence degrades to a counted note, never a facet.
  */
 export const TESTING_TUNING = {
   /** A placement becomes a facet iff winner ≥ 80% of the sample… */

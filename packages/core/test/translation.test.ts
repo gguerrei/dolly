@@ -183,7 +183,7 @@ describe("translation", () => {
     expect(calls.length).toBe(0); // planning never calls the model
   });
 
-  test("ADR-0004's bounds: at most 25 files per apply, 64 KiB per file", async () => {
+  test("translation's bounds: at most 25 files per apply, 64 KiB per file", async () => {
     const store = await freshStore();
     await seed(store, { name: "ts-service", languages: { programming: ["TypeScript"] } });
     const files: Record<string, string> = { "src/big.py": `# ${"x".repeat(65 * 1024)}\n` };

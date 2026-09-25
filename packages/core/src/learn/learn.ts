@@ -1,6 +1,6 @@
 /**
  * Learning mode: a watcher that turns a project's drift into proposals the
- * pattern can adopt, one accepted change at a time (docs/design/ai.md).
+ * pattern can adopt, one accepted change at a time.
  * The engine drafts and applies; deciding stays with the user, so nothing
  * here writes a pattern until it is handed the accepted list.
  */

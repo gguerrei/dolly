@@ -5,8 +5,8 @@ import { runGit } from "../tree/git";
 import { type Inventory, rootFiles } from "../tree/inventory";
 
 /**
- * The releases facet: the tag shape from history (ADR-0005's second and
- * last exception), the changelog's style and the release tool from the
+ * The releases facet: the tag shape from history (the second and last
+ * read past the tree), the changelog's style and the release tool from the
  * tree. Each field is absent rather than guessed.
  */
 export const RELEASES_TUNING = {

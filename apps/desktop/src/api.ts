@@ -1,5 +1,5 @@
 /**
- * The typed client for `dolly serve`'s /api (docs/design/gui.md). The token
+ * The typed client for `dolly serve`'s /api. The token
  * arrives once in the printed URL's fragment, moves into this tab's session,
  * and rides every request as a bearer header, never a cookie.
  */

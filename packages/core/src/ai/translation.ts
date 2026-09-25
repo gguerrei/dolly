@@ -1,7 +1,7 @@
 /**
  * Cross-language translation: the AI layer's third consumer, and the one
- * where the model produces content the engine cannot (ADR-0004,
- * docs/design/translation.md). The planner decides which files, to which
+ * where the model produces content the engine cannot, the one exception
+ * the layer's rules carve, behind apply. The planner decides which files, to which
  * language, at which paths; this module fills in the bytes of each file
  * under apply, one call per file, the whole file back or the step fails.
  */

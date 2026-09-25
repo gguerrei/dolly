@@ -3,7 +3,7 @@ import { runGit } from "../tree/git";
 
 /**
  * Votes the commits facet from the subject lines of recent history, the
- * first scanner to read past the working tree (ADR-0005). Absent without a
+ * first scanner to read past the working tree. Absent without a
  * repository, without git, or with too little history; a style short of
  * the bar degrades to a counted note like every other facet.
  */

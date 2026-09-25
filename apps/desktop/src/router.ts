@@ -1,6 +1,6 @@
 import { ref } from "vue";
 
-/** Seven views behind a hash, all the routing dolly needs (docs/design/gui.md). */
+/** Seven views behind a hash, all the routing dolly needs. */
 export type Route =
   | { view: "library" }
   | { view: "pattern"; name: string }

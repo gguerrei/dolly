@@ -93,7 +93,7 @@ async function extractRepo(repoPath: string, name?: string): Promise<RepoExtract
   const license = await scanLicense(inventory);
   const scaffold = await scanScaffold(inventory, layout.templateGroups, identity);
   const testing = scanTesting(inventory, languages.languages);
-  // The two reads past the tree, under ADR-0005.
+  // The two reads past the tree: the history facets.
   const commits = await scanCommits(root);
   const releases = await scanReleases(inventory);
 

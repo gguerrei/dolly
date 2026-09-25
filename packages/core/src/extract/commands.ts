@@ -38,7 +38,7 @@ export async function scanCommands(
 ): Promise<CommandsScan> {
   const notes: string[] = [];
   // The toolchain facet already resolved which task runner owns the verbs;
-  // reading any other source could contradict it (ADR-0003: one owner).
+  // reading any other source could contradict it (one owner per fact).
   const runner = toolchain?.taskRunner;
   let commands: Commands | undefined;
 

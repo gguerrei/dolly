@@ -46,7 +46,7 @@ fn daemon() -> Command {
 
 pub fn run() {
     tauri::Builder::default()
-        // Native pickers for the webview (docs/design/gui.md, "The native shell");
+        // Native pickers for the webview;
         // the daemon stays the only door to the engine.
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {

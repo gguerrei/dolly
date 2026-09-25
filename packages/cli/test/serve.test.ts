@@ -61,7 +61,7 @@ const DOCS_REQUIRED = [
   "",
 ].join("\n");
 
-/** The wire shapes under test, mirrored from docs/design/gui.md. */
+/** The wire shapes under test, mirrored from the daemon's routes. */
 interface PatternWire {
   name: string;
   source: string;

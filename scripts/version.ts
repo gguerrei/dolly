@@ -2,7 +2,7 @@
 /**
  * One version for the files that carry it. `bun run version:set 0.1.0` writes
  * it into every one; `bun run version:check` fails when they disagree, which
- * CI runs so a release cannot ship two numbers (docs/RELEASING.md).
+ * CI runs so a release cannot ship two numbers.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";

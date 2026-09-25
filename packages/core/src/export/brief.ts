@@ -13,8 +13,8 @@ import type {
 /**
  * The brief: a pattern's facets as prose a reader (or a model) can follow
  * without dolly, then the author's own conventions. Every text target
- * renders this one body and adds only its frame (docs/design/exports.md,
- * rule 1), so no two exports can disagree on what a facet means.
+ * renders this one body and adds only its frame, so no two exports can
+ * disagree on what a facet means.
  */
 export function renderBrief(doc: PatternDocument): string {
   const { pattern } = doc;

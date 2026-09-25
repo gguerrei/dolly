@@ -1,6 +1,6 @@
 /**
  * Drift: where a project has moved away from its pattern, as proposals the
- * pattern could adopt (docs/design/ai.md, learning mode). The project is
+ * pattern could adopt. The project is
  * re-extracted with the same scanners `extract` uses and compared facet by
  * facet. Proposals only ever add or replace: a pattern losing something is
  * check's conversation, not learn's.

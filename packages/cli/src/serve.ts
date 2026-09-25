@@ -57,7 +57,7 @@ import pkg from "../package.json";
 import { checkView } from "./views";
 
 /**
- * `dolly serve`: the engine's one door for the GUI (docs/design/gui.md).
+ * `dolly serve`: the engine's one door for the GUI.
  * Every route is a barrel export plus a JSON view, no logic of its own.
  * The daemon binds 127.0.0.1 only; `/api` additionally requires this run's
  * bearer token, which travels in the printed URL's fragment so it never

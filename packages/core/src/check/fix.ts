@@ -10,7 +10,7 @@ import { deepEqual, parseLoose } from "./support";
  * A fix is data, not a closure; the one executor below interprets it. This
  * is what lets a `CheckReport` travel as JSON (the daemon, fit's dry-run
  * diff) while the write behavior stays in exactly one place. Three verbs
- * plus one explicit exception, mirroring docs/design/check.md: fixes only
+ * plus one explicit exception: fixes only
  * ever create, append, or merge; `write` exists solely for a config the
  * pattern binds `verbatim`, the one overwrite a user opts into by name.
  */

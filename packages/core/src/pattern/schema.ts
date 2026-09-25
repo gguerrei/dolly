@@ -196,8 +196,8 @@ export const languagesSchema = z.strictObject({
 });
 
 /**
- * How commit messages are written, voted from history under ADR-0005's
- * exception. `types` and `scope` are only meaningful for the conventional
+ * How commit messages are written, voted from history, the one read past
+ * the tree the pattern model allows. `types` and `scope` are only meaningful for the conventional
  * style; `subject` is the case of the subject line's first letter.
  */
 export const commitsSchema = z.strictObject({
@@ -218,12 +218,12 @@ export const releasesSchema = z.strictObject({
 /**
  * The machine-readable half of a pattern: the facets the deterministic engine
  * can extract, scaffold, and check without any AI. Grows facet by facet.
- * `format` stays 1 while the schema is pre-public (ADR-0003); bump discipline
+ * `format` stays 1 while the schema is pre-public; bump discipline
  * starts at the first public release.
  */
 /**
  * The pattern format this dolly reads and writes. Fluid under 1 until the
- * first public release (ADR-0003, rule 5); from then on a change that an
+ * first public release; from then on a change that an
  * older dolly could misread bumps it, with a migration in `document.ts`.
  */
 export const PATTERN_FORMAT = 1;
