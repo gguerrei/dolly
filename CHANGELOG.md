@@ -191,7 +191,7 @@ The sweep before going public (SECURITY.md says what dolly trusts):
   existing file is refused without `--force`. The daemon previews and
   saves the text targets on `GET` and `POST /api/export`.
 - The `commits` and `releases` facets, the first to read git history under
-  the exception [ADR-0005](docs/adr/0005-history-facets.md) carves:
+  the exception ADR-0005 carves:
   message style, types, scopes and subject case voted from the last 200
   commits; the tag shape, the changelog's style and the release tool. A
   `releases` check rule creates a missing Keep a Changelog file and

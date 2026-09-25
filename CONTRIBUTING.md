@@ -43,8 +43,7 @@ Code follows the approved board and the port is reviewed against it. One
 exception: a small addition to an approved board that reuses its own
 components and vocabulary (a button, a toggle, a tile, a row action) is
 ported directly and reviewed live. The boards live in
-[docs/design/canvas/](docs/design/canvas/README.md); the rule itself is in
-[docs/PLAN.md](docs/PLAN.md), "How visual work happens".
+the maintainer's design canvas, which the pull request review compares the port against.
 
 ## Commits
 
@@ -64,4 +63,4 @@ docs: clarify pattern store location in README
 
 ## Roadmap
 
-See [docs/PLAN.md](docs/PLAN.md) for where the project is headed. If you want to work on something substantial, open an issue first so we can align before you invest time.
+The README's roadmap says where the project is headed. If you want to work on something substantial, open an issue first so we can align before you invest time.

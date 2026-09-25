@@ -2,7 +2,7 @@
 
 dolly's GUI: a Vue 3 webview served by the local daemon. The design (the
 daemon protocol, the views, and why this app never links the engine
-directly) is in [docs/design/gui.md](../../docs/design/gui.md).
+directly) is described in the daemon's source, `packages/cli/src/serve.ts`.
 
 ## Use it
 

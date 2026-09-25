@@ -5,7 +5,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/*.vue", "!docs/design/canvas"]
+    "includes": ["**", "!**/*.vue"]
   },
   "formatter": {
     "indentStyle": "space",

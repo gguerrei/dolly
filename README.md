@@ -33,8 +33,6 @@ dolly is a local-first tool that captures how a project is organized, from lint 
 
 ## On the roadmap
 
-Details and milestones live in [docs/PLAN.md](docs/PLAN.md).
-
 - After 0.1.0: a Linux AppImage (the deb and rpm ship today), the design canvas re-seeded with the check view's marker board, and whatever the first users ask for
 
 ## Development
@@ -91,7 +89,6 @@ Extraction refuses to guess. Where a project is genuinely inconsistent (mixed fi
 packages/core   # @dollysheep/core: the engine (pattern model, extract, new/check/fit, learn, AI adapters)
 packages/cli    # dollysheep: the `dolly` command, incl. the `serve` daemon
 apps/desktop    # the GUI webview (Vue 3), served by `dolly serve`, and the Tauri shell (src-tauri/)
-docs/           # plan, ADRs, design notes
 ```
 
 ## Contributing

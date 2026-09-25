@@ -20,14 +20,9 @@ console.log(report.violations.length === 0 ? "clean" : report.violations);
 ```
 
 Everything exported from the package's entry point is the public API, one
-function per verb, typed. What is not exported is internal and free to
-move. The design docs in the repository say how each verb behaves:
-[extract](https://github.com/gguerrei/dolly/blob/main/docs/design/extract.md),
-[new](https://github.com/gguerrei/dolly/blob/main/docs/design/new.md),
-[check](https://github.com/gguerrei/dolly/blob/main/docs/design/check.md),
-[fit](https://github.com/gguerrei/dolly/blob/main/docs/design/fit.md),
-[exports](https://github.com/gguerrei/dolly/blob/main/docs/design/exports.md),
-[ai](https://github.com/gguerrei/dolly/blob/main/docs/design/ai.md).
+function per verb, typed and documented at the declaration. What is not
+exported is internal and free to move; the `dolly` command's own help
+says what each verb does.
 
 MIT licensed; the notices for what the package bundles are in
 `THIRD_PARTY_LICENSES.md` beside this file.

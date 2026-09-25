@@ -11,5 +11,5 @@
 - **A vulnerability**: not an issue; see [SECURITY.md](SECURITY.md).
 
 Before asking, `dolly --help` lists every verb, `dolly show <pattern>` prints
-a pattern with its extraction notes, and [docs/PLAN.md](docs/PLAN.md) says
+a pattern with its extraction notes, and the README's roadmap says
 what exists and what is still ahead.

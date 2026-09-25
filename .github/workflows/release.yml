@@ -4,7 +4,7 @@ name: Release
 # installers with the compiled daemon as their sidecar, then opens a draft
 # release carrying them with a SHA256SUMS file. Publishing the draft is the
 # maintainer's, and publishing it runs publish.yml, which puts the two npm
-# packages out (docs/RELEASING.md). Every action is pinned to a commit.
+# packages out. Every action is pinned to a commit.
 
 on:
   push:
