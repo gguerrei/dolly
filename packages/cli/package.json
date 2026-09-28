@@ -2,7 +2,7 @@
   "name": "dollysheep",
   "version": "0.1.1",
   "type": "module",
-  "description": "dolly: save the way you build software as a pattern, then apply it anywhere. The command line, the local daemon, and the GUI it serves.",
+  "description": "Extract repository conventions, export agent instructions, and check projects for drift. A local CLI with an included GUI.",
   "license": "MIT",
   "homepage": "https://github.com/gguerrei/dolly#readme",
   "repository": {
@@ -17,6 +17,10 @@
     "project-structure",
     "conventions",
     "patterns",
+    "agents-md",
+    "claude-code",
+    "cursor",
+    "developer-tools",
     "cli",
     "bun"
   ],
